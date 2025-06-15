@@ -701,7 +701,7 @@ export default function MessageChannel({
                 )}
             </div>
 
-            <div className={cn("border-t p-3")}>
+            <div className={"min-h-16 content-center border-t px-3 py-2"}>
                 {/* File Attachments Preview */}
                 {selectedFiles.length > 0 && (
                     <div className="mb-3 flex flex-wrap gap-2">
@@ -805,9 +805,10 @@ export default function MessageChannel({
                         value={messageText}
                         onChange={(e) => setMessageText(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        className="max-h-[120px] min-h-[40px] flex-grow resize-none overflow-y-auto"
+                        className="max-h-96 min-h-[40px] flex-grow resize-none overflow-y-auto"
                         rows={1}
                         disabled={sending || !canWrite}
+                        data-scrollbar-custom
                     />
 
                     <EmojiPopup onEmojiSelect={handleEmojiSelect}>

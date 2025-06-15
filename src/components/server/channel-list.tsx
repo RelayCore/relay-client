@@ -635,7 +635,7 @@ function UserPanel({
     };
 
     return (
-        <div className="bg-muted border-border border-t p-2">
+        <div className="bg-muted border-border min-h-16 content-center border-t p-2">
             {connectedVoiceChannel && (
                 <div className="mb-2 flex items-center justify-between">
                     <div className="min-w-0 flex-1">
