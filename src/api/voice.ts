@@ -163,6 +163,7 @@ export class VoiceAudioManager {
     private pushToTalkKey = "Space";
 
     private audioElements = new Map<string, HTMLAudioElement>();
+    private userVolumes = new Map<string, number>(); // Individual user volumes (0-1)
     private onSpeakingChange?: (isSpeaking: boolean) => void;
     private onAudioData?: (data: ArrayBuffer) => void;
     private keyEventHandlers: {
@@ -172,6 +173,7 @@ export class VoiceAudioManager {
 
     constructor() {
         this.loadSettings();
+        this.loadUserVolumes();
     }
 
     private loadSettings(): void {
@@ -187,6 +189,27 @@ export class VoiceAudioManager {
         this.outputVolume =
             parseInt(getSetting("outputVolume") as string) / 100;
         this.pushToTalkKey = getSetting("pushToTalkKey") as string;
+    }
+
+    private loadUserVolumes(): void {
+        try {
+            const saved = localStorage.getItem("voice_user_volumes");
+            if (saved) {
+                const volumes = JSON.parse(saved);
+                this.userVolumes = new Map(Object.entries(volumes));
+            }
+        } catch (error) {
+            console.warn("Failed to load user volumes:", error);
+        }
+    }
+
+    private saveUserVolumes(): void {
+        try {
+            const volumes = Object.fromEntries(this.userVolumes);
+            localStorage.setItem("voice_user_volumes", JSON.stringify(volumes));
+        } catch (error) {
+            console.warn("Failed to save user volumes:", error);
+        }
     }
 
     updateSettings(settings: Partial<SettingsInterface>): void {
@@ -230,9 +253,44 @@ export class VoiceAudioManager {
     }
 
     private updateOutputVolume(): void {
-        this.audioElements.forEach((audio) => {
-            audio.volume = this.outputVolume;
+        this.audioElements.forEach((audio, userId) => {
+            const userVolume = this.getUserVolume(userId);
+            audio.volume = this.outputVolume * userVolume;
         });
+    }
+
+    setUserVolume(userId: string, volume: number): void {
+        // Clamp volume between 0 and 2 (0% to 200%)
+        const clampedVolume = Math.max(0, Math.min(2, volume));
+        this.userVolumes.set(userId, clampedVolume);
+
+        // Apply to existing audio element if it exists
+        const audio = this.audioElements.get(userId);
+        if (audio) {
+            audio.volume = this.outputVolume * clampedVolume;
+        }
+
+        this.saveUserVolumes();
+    }
+
+    getUserVolume(userId: string): number {
+        return this.userVolumes.get(userId) ?? 1.0;
+    }
+
+    resetUserVolume(userId: string): void {
+        this.userVolumes.delete(userId);
+
+        // Apply default volume to audio element
+        const audio = this.audioElements.get(userId);
+        if (audio) {
+            audio.volume = this.outputVolume;
+        }
+
+        this.saveUserVolumes();
+    }
+
+    getAllUserVolumes(): Map<string, number> {
+        return new Map(this.userVolumes);
     }
 
     async requestPermissions(): Promise<void> {
@@ -481,7 +539,8 @@ export class VoiceAudioManager {
         if (!audio) {
             audio = new Audio();
             audio.autoplay = true;
-            audio.volume = this.outputVolume;
+            const userVolume = this.getUserVolume(userId);
+            audio.volume = this.outputVolume * userVolume;
             this.audioElements.set(userId, audio);
         }
 
@@ -651,6 +710,22 @@ export class VoiceClient {
 
     setPushToTalkMode(enabled: boolean): void {
         this.audioManager.setPushToTalkMode(enabled);
+    }
+
+    setUserVolume(userId: string, volume: number): void {
+        this.audioManager.setUserVolume(userId, volume);
+    }
+
+    getUserVolume(userId: string): number {
+        return this.audioManager.getUserVolume(userId);
+    }
+
+    resetUserVolume(userId: string): void {
+        this.audioManager.resetUserVolume(userId);
+    }
+
+    getAllUserVolumes(): Map<string, number> {
+        return this.audioManager.getAllUserVolumes();
     }
 
     updateSettings(settings: Partial<SettingsInterface>): void {
