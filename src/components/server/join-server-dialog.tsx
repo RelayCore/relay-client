@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { generateKeyPair } from "@/utils/crypto";
 import { joinServer } from "@/api/join";
+import { uploadProfilePicture } from "@/api/server";
 import { Loader2 } from "lucide-react";
 import { getSetting } from "@/utils/settings";
 import { addServer } from "@/storage/server-store";
@@ -111,6 +112,35 @@ export function JoinServerDialog({
 
                 // Add server to storage
                 await addServer(serverRecord);
+
+                // Upload profile picture if one is set
+                const profilePicturePath = getSetting("userAvatar") as string;
+                if (profilePicturePath && profilePicturePath.trim()) {
+                    try {
+                        // Convert file path to File object
+                        const response = await fetch(
+                            `file://${profilePicturePath}`,
+                        );
+                        const blob = await response.blob();
+                        const fileName =
+                            profilePicturePath.split(/[\\/]/).pop() || "avatar";
+                        const file = new File([blob], fileName, {
+                            type: blob.type,
+                        });
+
+                        await uploadProfilePicture(
+                            serverUrl.trim(),
+                            result.userId!,
+                            file,
+                        );
+                    } catch (profileError) {
+                        console.warn(
+                            "Failed to upload profile picture:",
+                            profileError,
+                        );
+                        // Don't fail the entire join process if profile upload fails
+                    }
+                }
 
                 setConnectionStatus({
                     type: "success",

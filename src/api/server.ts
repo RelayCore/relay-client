@@ -195,6 +195,12 @@ export interface Invite {
     uses: number;
 }
 
+export interface UploadProfilePictureResponse {
+    message: string;
+    profile_url: string;
+    hash: string;
+}
+
 // Get server metadata
 export async function getServerInfo(serverUrl: string): Promise<ServerInfo> {
     const response = await fetch(`${serverUrl}/server`);
@@ -924,4 +930,28 @@ export function canPinInChannel(
     }
 
     return false;
+}
+
+export async function uploadProfilePicture(
+    serverUrl: string,
+    userId: string,
+    file: File,
+): Promise<UploadProfilePictureResponse> {
+    const formData = new FormData();
+    formData.append("profile_picture", file);
+
+    const response = await fetch(`${serverUrl}/user/profile-picture`, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${userId}`,
+        },
+        body: formData,
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to upload profile picture");
+    }
+
+    return response.json();
 }
