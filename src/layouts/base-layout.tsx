@@ -17,7 +17,7 @@ import {
     BreadcrumbList,
     BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { HomeIcon, ServerIcon, SettingsIcon } from "lucide-react";
+import { HomeIcon, ServerIcon, SettingsIcon, Plus } from "lucide-react";
 import {
     useNavigate,
     useParams,
@@ -31,10 +31,10 @@ import { Toaster } from "@/components/ui/sonner";
 import { ConfirmProvider } from "@/contexts/confirm-context";
 import { DevContextMenu } from "@/components/dev/dev-context-menu";
 import { platform } from "@/platform";
-import { Separator } from "@/components/ui/separator";
 import { loadServers, ServerRecord } from "@/storage/server-store";
 import { ServerProvider } from "@/contexts/server-context";
 import { webSocketManager } from "@/websocket/websocket-manager";
+import { JoinServerDialog } from "@/components/server/join-server-dialog";
 
 // Add interface for server metadata
 interface ServerMetadata {
@@ -482,7 +482,14 @@ function BaseLayoutContent({
                         </SidebarMenu>
                     </SidebarContent>
                     <SidebarFooter>
-                        <Separator />
+                        <SidebarMenuItem>
+                            <JoinServerDialog>
+                                <SidebarMenuButton tooltip="Add Server">
+                                    <Plus />
+                                    <span className="truncate">Add Server</span>
+                                </SidebarMenuButton>
+                            </JoinServerDialog>
+                        </SidebarMenuItem>
 
                         <SidebarMenuItem>
                             <SidebarMenuButton
