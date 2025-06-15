@@ -100,20 +100,25 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                             serverRecord.server_max_users ||
                             100,
                         icon: meta.icon || serverRecord.server_icon || "",
+                        current_users: meta.current_users || 0,
+                        max_file_size: meta.max_file_size || 0,
+                        max_attachments: meta.max_attachments || 0,
                     };
                 }
             }
-        } catch (error) {
-            console.warn("Failed to load cached server metadata:", error);
+        } catch {
+            // Fall back to server record data
         }
 
-        // Fall back to server record data
         return {
             name: serverRecord.server_name || "Unknown Server",
             description: serverRecord.server_description || "",
             allow_invite: serverRecord.server_allow_invite || false,
             max_users: serverRecord.server_max_users || 100,
             icon: serverRecord.server_icon || "",
+            current_users: 0,
+            max_file_size: 0,
+            max_attachments: 0,
         };
     }, [serverRecord, userId]);
 
