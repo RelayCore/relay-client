@@ -57,6 +57,10 @@ export class WebSocketConnection {
     private isIntentionallyClosed = false;
     private messageHandlers = new Set<MessageHandler>();
     private voiceClient: VoiceClient;
+    private connectionState: "disconnected" | "connecting" | "connected" =
+        "disconnected";
+    private lastPingTime = 0;
+    private pingInterval: NodeJS.Timeout | null = null;
 
     constructor(
         private server: ServerRecord,
@@ -69,8 +73,19 @@ export class WebSocketConnection {
     }
 
     async connect(): Promise<void> {
-        if (this.ws?.readyState === WebSocket.OPEN) {
+        if (
+            this.connectionState === "connected" ||
+            this.connectionState === "connecting"
+        ) {
             return;
+        }
+
+        this.connectionState = "connecting";
+
+        // Clear any existing connection
+        if (this.ws) {
+            this.ws.close();
+            this.ws = null;
         }
 
         return new Promise((resolve, reject) => {
@@ -84,17 +99,30 @@ export class WebSocketConnection {
                 console.log(`[WebSocket] Connecting to: ${url}`);
                 this.ws = new WebSocket(url);
 
+                // Set connection timeout
+                const connectionTimeout = setTimeout(() => {
+                    if (this.connectionState === "connecting") {
+                        this.ws?.close();
+                        reject(new Error("Connection timeout"));
+                    }
+                }, 10000);
+
                 this.ws.onopen = () => {
+                    clearTimeout(connectionTimeout);
                     console.log(
                         `[WebSocket] Connected to ${this.server.server_name}`,
                     );
+                    this.connectionState = "connected";
                     this.reconnectAttempts = 0;
                     this.reconnectDelay = 1000;
+                    this.startPingMonitoring();
                     this.onConnectionChange?.(true);
                     resolve();
                 };
 
                 this.ws.onmessage = (event) => {
+                    this.lastPingTime = Date.now();
+
                     try {
                         if (typeof event.data === "string") {
                             const message: WebSocketMessage = JSON.parse(
@@ -109,7 +137,6 @@ export class WebSocketConnection {
                             console.log(
                                 `[WebSocket] Binary data received, length: ${event.data.byteLength}`,
                             );
-                            // Handle binary audio data here if needed
                         }
                     } catch (error) {
                         console.error(
@@ -120,11 +147,14 @@ export class WebSocketConnection {
                 };
 
                 this.ws.onclose = (event) => {
+                    clearTimeout(connectionTimeout);
                     console.log(
                         `[WebSocket] Disconnected:`,
                         event.code,
                         event.reason,
                     );
+                    this.connectionState = "disconnected";
+                    this.stopPingMonitoring();
                     this.onConnectionChange?.(false);
 
                     if (
@@ -136,13 +166,37 @@ export class WebSocketConnection {
                 };
 
                 this.ws.onerror = (error) => {
+                    clearTimeout(connectionTimeout);
                     console.error(`[WebSocket] Error:`, error);
+                    this.connectionState = "disconnected";
                     reject(error);
                 };
             } catch (error) {
+                this.connectionState = "disconnected";
                 reject(error);
             }
         });
+    }
+
+    private startPingMonitoring() {
+        this.lastPingTime = Date.now();
+        this.pingInterval = setInterval(() => {
+            const timeSinceLastPing = Date.now() - this.lastPingTime;
+            if (timeSinceLastPing > 70000) {
+                // 70 seconds without any message
+                console.warn(
+                    "[WebSocket] Connection appears dead, forcing reconnect",
+                );
+                this.ws?.close();
+            }
+        }, 30000);
+    }
+
+    private stopPingMonitoring() {
+        if (this.pingInterval) {
+            clearInterval(this.pingInterval);
+            this.pingInterval = null;
+        }
     }
 
     private scheduleReconnect() {
@@ -156,15 +210,18 @@ export class WebSocketConnection {
         );
 
         console.log(
-            `[WebSocket] Reconnecting in ${delay}ms (attempt ${
-                this.reconnectAttempts + 1
-            }/${this.maxReconnectAttempts})`,
+            `[WebSocket] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`,
         );
 
         this.reconnectTimer = setTimeout(() => {
             this.reconnectAttempts++;
             this.connect().catch((error) => {
                 console.error(`[WebSocket] Reconnection failed:`, error);
+                if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                    console.error(
+                        `[WebSocket] Max reconnection attempts reached`,
+                    );
+                }
             });
         }, delay);
     }
@@ -246,10 +303,14 @@ export class WebSocketConnection {
 
     disconnect() {
         this.isIntentionallyClosed = true;
+        this.connectionState = "disconnected";
+        this.stopPingMonitoring();
+
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
         }
+
         if (this.ws) {
             this.ws.close();
             this.ws = null;
@@ -257,7 +318,10 @@ export class WebSocketConnection {
     }
 
     get isConnected(): boolean {
-        return this.ws?.readyState === WebSocket.OPEN;
+        return (
+            this.connectionState === "connected" &&
+            this.ws?.readyState === WebSocket.OPEN
+        );
     }
 
     get voice(): VoiceClient {
