@@ -523,6 +523,9 @@ function ChannelItem({
                                                 participant.nickname ||
                                                 participant.username
                                             }
+                                            profilePictureUrl={
+                                                participant.profile_picture_url
+                                            }
                                             className={cn(
                                                 "h-6 w-6 text-xs",
                                                 participant.is_speaking

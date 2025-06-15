@@ -135,6 +135,7 @@ export interface VoiceParticipant {
     is_deafened: boolean;
     is_speaking: boolean;
     joined_at: string;
+    profile_picture_url?: string;
 }
 
 export interface ChannelPermissionRequest {
