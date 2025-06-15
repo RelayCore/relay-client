@@ -36,6 +36,7 @@ import { UserPopover } from "./user-popup";
 import { useMembers } from "@/contexts/server-context";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useServer } from "@/contexts/server-context";
+import { EmojiPopup } from "./emoji-popup";
 
 export interface MessageChannelProps {
     channelId: number;
@@ -71,6 +72,7 @@ export default function MessageChannel({
     const messagesContainerRef = React.useRef<HTMLDivElement>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const dropZoneRef = React.useRef<HTMLDivElement>(null);
+    const textareaRef = React.useRef<HTMLTextAreaElement>(null);
     const { currentUser } = useCurrentUser();
     const { serverInfo } = useServer(); // <-- get serverInfo from context
 
@@ -478,6 +480,31 @@ export default function MessageChannel({
         fetchChannelData();
     }, [channelId, currentUserId, serverUrl]);
 
+    const handleEmojiSelect = React.useCallback(
+        (emoji: string) => {
+            if (!textareaRef.current) return;
+
+            const textarea = textareaRef.current;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const currentText = messageText;
+
+            const newText =
+                currentText.slice(0, start) + emoji + currentText.slice(end);
+            setMessageText(newText);
+
+            // Set cursor position after the emoji
+            setTimeout(() => {
+                if (textarea) {
+                    const newPosition = start + emoji.length;
+                    textarea.setSelectionRange(newPosition, newPosition);
+                    textarea.focus();
+                }
+            }, 0);
+        },
+        [messageText],
+    );
+
     if (loading) {
         return <MessageChannelSkeleton />;
     }
@@ -768,6 +795,7 @@ export default function MessageChannel({
                     </Button>
 
                     <Textarea
+                        ref={textareaRef}
                         placeholder={
                             canWrite
                                 ? `Message #${channelName}`
@@ -781,14 +809,16 @@ export default function MessageChannel({
                         disabled={sending || !canWrite}
                     />
 
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground hover:text-foreground"
-                        disabled={sending || !canWrite}
-                    >
-                        <Smile size={20} />
-                    </Button>
+                    <EmojiPopup onEmojiSelect={handleEmojiSelect}>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-foreground"
+                            disabled={sending || !canWrite}
+                        >
+                            <Smile size={20} />
+                        </Button>
+                    </EmojiPopup>
 
                     <Button
                         variant={
