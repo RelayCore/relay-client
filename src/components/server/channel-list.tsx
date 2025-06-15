@@ -406,18 +406,18 @@ function GroupHeader({
     onCreateChannel: () => void;
 }) {
     return (
-        <button
-            onClick={onToggle}
-            className="text-muted-foreground hover:text-foreground group flex w-full items-center justify-between px-1 py-1 text-xs font-semibold transition-colors"
-        >
-            <div className="flex items-center gap-0.5">
+        <div className="text-muted-foreground hover:text-foreground group flex w-full items-center justify-between px-1 py-1 text-xs font-semibold transition-colors">
+            <button
+                onClick={onToggle}
+                className="hover:text-foreground flex items-center gap-0.5"
+            >
                 {group.expanded ? (
                     <ChevronDown size={14} />
                 ) : (
                     <ChevronRight size={14} />
                 )}
                 <span className="uppercase">{group.name}</span>
-            </div>
+            </button>
 
             <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                 <TooltipProvider>
@@ -425,10 +425,7 @@ function GroupHeader({
                         <TooltipTrigger asChild>
                             <button
                                 className="text-muted-foreground hover:text-foreground"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onCreateChannel();
-                                }}
+                                onClick={onCreateChannel}
                             >
                                 <Plus size={14} />
                             </button>
@@ -448,7 +445,7 @@ function GroupHeader({
                     </Tooltip>
                 </TooltipProvider>
             </div>
-        </button>
+        </div>
     );
 }
 
