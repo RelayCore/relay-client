@@ -1,4 +1,3 @@
-import { updateAvatarOnAllServers } from "./api/profile-picture";
 import { setTheme } from "./helpers/theme-helpers";
 import { Setting } from "./utils/settings";
 
@@ -108,21 +107,9 @@ export const APP_SETTINGS: AppSettings = {
                 label: "Profile Picture",
                 type: "file-picker",
                 default: "",
-                dialogOptions: {
-                    title: "Select Profile Picture",
-                    filters: [
-                        {
-                            name: "Images",
-                            extensions: ["png", "jpg", "jpeg", "gif", "webp"],
-                        },
-                    ],
-                    properties: ["openFile", "showHiddenFiles"],
-                },
                 description: "Choose an image to use as your profile picture",
-                onChange: (value: unknown) => {
-                    updateAvatarOnAllServers(value as string);
-                },
                 groups: ["Identity"],
+                customRender: true,
             },
         },
     },

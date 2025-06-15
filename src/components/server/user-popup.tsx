@@ -1,7 +1,6 @@
 import React from "react";
 import { User } from "@/api/server";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/tailwind";
@@ -12,6 +11,7 @@ import {
 } from "@/components/ui/popover";
 import { Circle } from "lucide-react";
 import { UserContextMenu } from "./user-context-menu";
+import { UserAvatar } from "./user-avatar";
 
 interface UserPopupProps {
     user: User;
@@ -30,19 +30,11 @@ function UserPopup({ user, currentUserId, className }: UserPopupProps) {
             {/* User header */}
             <div className="mb-4 flex items-center gap-3">
                 <div className="relative">
-                    <Avatar className="h-12 w-12">
-                        <AvatarFallback
-                            className="text-lg font-semibold"
-                            style={{
-                                backgroundColor: highestRole?.color
-                                    ? `${highestRole.color}20`
-                                    : undefined,
-                                color: highestRole?.color || undefined,
-                            }}
-                        >
-                            {user.username.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                        displayName={user.username}
+                        profilePictureUrl={user.profile_picture_url}
+                        className="h-12 w-12"
+                    />
                 </div>
                 <div className="min-w-0 flex-1">
                     <div className="text-foreground truncate font-semibold">
@@ -219,5 +211,3 @@ export function UserPopover({
         </UserContextMenu>
     );
 }
-
-export default UserPopup;

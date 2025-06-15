@@ -103,7 +103,7 @@ interface FileSystemContext {
 
     readFile: (
         filePath: string,
-        encoding?: string,
+        encoding?: string | null,
     ) => Promise<{ success: boolean; data?: string | Buffer; error?: string }>;
     writeFile: (
         filePath: string,

@@ -18,6 +18,7 @@ import { assetSrc } from "@/utils/assets";
 import { APP_CONFIG } from "@/config";
 
 import { MicrophoneTest } from "@/components/settings/microphone-test";
+import { AvatarCropper } from "@/components/settings/avatar-cropper";
 
 interface HierarchicalGroup {
     settings: Record<string, Setting>;
@@ -133,6 +134,7 @@ export default function SettingsPage() {
                 </SelectContent>
             </Select>
         ),
+        userAvatar: <AvatarCropper value={settings.userAvatar as string} />,
         testMicrophone: <MicrophoneTest />,
         appInfo: (
             <div className="space-y-8">

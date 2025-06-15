@@ -67,6 +67,7 @@ export interface User {
     nickname: string;
     roles: Role[];
     is_online: boolean;
+    profile_picture_url?: string;
 }
 
 export type Permission =

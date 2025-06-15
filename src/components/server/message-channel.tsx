@@ -3,7 +3,6 @@ import { cn } from "@/utils/tailwind";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
     Send,
     Smile,
@@ -38,6 +37,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { useServer } from "@/contexts/server-context";
 import { EmojiPopup } from "./emoji-popup";
 import { CustomVideoPlayer } from "./video-player";
+import { UserAvatar } from "./user-avatar";
 
 export interface MessageChannelProps {
     channelId: number;
@@ -873,13 +873,11 @@ function MessageItem({
         nickname: "",
         roles: [],
         is_online: false,
+        profile_picture_url: "",
         created_at: new Date().toISOString(),
     };
 
     const displayName = user.nickname || user.username || userId;
-    const avatarText = displayName
-        ? displayName.substring(0, 2).toUpperCase()
-        : "U";
 
     // Find highest role with a color
     const highestColoredRole = [...user.roles]
@@ -897,20 +895,13 @@ function MessageItem({
             {(showHeader && (
                 <div className="flex items-center gap-2">
                     <UserPopover user={user} currentUserId={currentUserId}>
-                        <Avatar className="h-10 w-10 cursor-pointer self-start">
-                            <AvatarFallback
-                                className="text-sm"
-                                style={{
-                                    backgroundColor: highestColoredRole?.color
-                                        ? `${highestColoredRole.color}20`
-                                        : undefined,
-                                    color:
-                                        highestColoredRole?.color || undefined,
-                                }}
-                            >
-                                {avatarText}
-                            </AvatarFallback>
-                        </Avatar>
+                        <div className="cursor-pointer self-start">
+                            <UserAvatar
+                                displayName={displayName}
+                                profilePictureUrl={user.profile_picture_url}
+                                className="h-10 w-10"
+                            />
+                        </div>
                     </UserPopover>
 
                     <div>

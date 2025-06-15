@@ -35,7 +35,7 @@ export function exposeFileContext() {
             ipcRenderer.invoke(FILE_SAVE_DIALOG_CHANNEL, options),
 
         // File operations
-        readFile: (filePath: string, encoding?: string) =>
+        readFile: (filePath: string, encoding?: string | null) =>
             ipcRenderer.invoke(FILE_READ_CHANNEL, filePath, encoding),
         writeFile: (
             filePath: string,

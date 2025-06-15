@@ -154,7 +154,10 @@ export function addFileEventListeners(mainWindow: BrowserWindow) {
         FILE_READ_CHANNEL,
         async (_, filePath, encoding = "utf8") => {
             try {
-                const data = await fs.readFile(filePath, encoding);
+                const data =
+                    encoding === null
+                        ? await fs.readFile(filePath)
+                        : await fs.readFile(filePath, encoding);
                 return { success: true, data };
             } catch (error) {
                 return {

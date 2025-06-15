@@ -49,8 +49,8 @@ async function filePathToFile(filePath: string): Promise<File> {
             throw new Error(`File does not exist: ${filePath}`);
         }
 
-        // Read file as buffer
-        const fileResult = await window.fileSystem.readFile(filePath);
+        // Read file as binary data (null encoding means binary)
+        const fileResult = await window.fileSystem.readFile(filePath, null);
         if (!fileResult.success) {
             throw new Error(`Failed to read file: ${fileResult.error}`);
         }
@@ -85,8 +85,34 @@ async function filePathToFile(filePath: string): Promise<File> {
         }
 
         // Convert buffer to File object
-        const buffer = fileResult.data as Buffer;
-        const blob = new Blob([buffer], { type: mimeType });
+        const buffer = fileResult.data;
+        if (!buffer) {
+            throw new Error("File data is undefined or empty.");
+        }
+        // If buffer is a Node.js Buffer, convert to Uint8Array
+        let uint8Array: Uint8Array;
+        if (buffer instanceof ArrayBuffer) {
+            uint8Array = new Uint8Array(buffer);
+        } else if (buffer instanceof Uint8Array) {
+            uint8Array = buffer;
+        } else if (
+            typeof Buffer !== "undefined" &&
+            typeof Buffer.isBuffer === "function" &&
+            Buffer.isBuffer(buffer)
+        ) {
+            uint8Array = new Uint8Array(
+                buffer.buffer,
+                buffer.byteOffset,
+                buffer.byteLength,
+            );
+        } else if (Array.isArray(buffer)) {
+            uint8Array = new Uint8Array(buffer);
+        } else {
+            throw new Error(
+                "Unsupported buffer type returned from fileSystem.readFile",
+            );
+        }
+        const blob = new Blob([uint8Array], { type: mimeType });
         return new File([blob], fileName, { type: mimeType });
     } catch (error) {
         throw new Error(

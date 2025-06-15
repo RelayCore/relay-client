@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { User } from "@/api/server";
 import { UserPopover } from "./user-popup";
 import { useMembers } from "@/contexts/server-context";
+import { UserAvatar } from "./user-avatar";
 
 export interface MemberGroup {
     id: string;
@@ -175,11 +176,11 @@ function MemberItem({
                 }}
             >
                 <div className="relative">
-                    <div className="bg-muted-foreground/20 h-8 w-8 overflow-hidden rounded-full">
-                        <div className="flex h-full w-full items-center justify-center text-xs">
-                            {displayName.substring(0, 2).toUpperCase()}
-                        </div>
-                    </div>
+                    <UserAvatar
+                        displayName={displayName}
+                        profilePictureUrl={member.profile_picture_url}
+                        className="h-8 w-8"
+                    />
 
                     <div
                         className={cn(

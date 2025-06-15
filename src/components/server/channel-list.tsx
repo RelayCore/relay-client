@@ -20,7 +20,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Channel, ChannelGroup, VoiceParticipant } from "@/api/server";
+import { Channel, ChannelGroup, User, VoiceParticipant } from "@/api/server";
 import { VoiceEventData } from "@/api/voice";
 import {
     webSocketManager,
@@ -34,6 +34,7 @@ import CreateChannelDialog from "./create-channel-dialog";
 import { ChannelContextMenu } from "./channel-context-menu";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import EditChannelDialog from "./edit-channel-dialog";
+import { UserAvatar } from "./user-avatar";
 
 interface ExpandedGroup extends ChannelGroup {
     expanded: boolean;
@@ -516,20 +517,19 @@ function ChannelItem({
                                 )}
                             >
                                 <div className="flex min-w-0 flex-1 items-center gap-2">
-                                    <div
-                                        className={cn(
-                                            "relative flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium",
-                                            participant.is_speaking
-                                                ? "bg-green-500 text-white ring-2 ring-green-400/50"
-                                                : "bg-gradient-to-br from-blue-500 to-purple-600 text-white",
-                                        )}
-                                    >
-                                        {(
-                                            participant.nickname ||
-                                            participant.username
-                                        )
-                                            .charAt(0)
-                                            .toUpperCase()}
+                                    <div className="relative">
+                                        <UserAvatar
+                                            displayName={
+                                                participant.nickname ||
+                                                participant.username
+                                            }
+                                            className={cn(
+                                                "h-6 w-6 text-xs",
+                                                participant.is_speaking
+                                                    ? "ring-2 ring-green-400/50"
+                                                    : "",
+                                            )}
+                                        />
                                         {participant.is_speaking && (
                                             <div className="absolute -inset-0.5 animate-pulse rounded-full bg-green-400 opacity-75" />
                                         )}
@@ -579,7 +579,7 @@ function ChannelItem({
 }
 
 interface UserPanelProps {
-    currentUser: { username: string; avatar_url?: string; id: string };
+    currentUser: User;
     connectedVoiceChannel?: Channel;
     onDisconnect: () => void;
 }
@@ -668,15 +668,17 @@ function UserPanel({
 
             <div className="flex items-center justify-between">
                 <div className="flex min-w-0 flex-1 items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-sm font-semibold text-white">
-                        {currentUser.username.charAt(0).toUpperCase()}
-                    </div>
+                    <UserAvatar
+                        displayName={currentUser.nickname}
+                        profilePictureUrl={currentUser.profile_picture_url}
+                        className="h-8 w-8"
+                    />
                     <div className="min-w-0 flex-1">
                         <span
                             className="block truncate text-sm font-medium"
-                            title={currentUser.username}
+                            title={currentUser.nickname}
                         >
-                            {currentUser.username}
+                            {currentUser.nickname}
                         </span>
                         <span className="text-muted-foreground text-xs">
                             {connectedVoiceChannel ? "In voice" : "Online"}
