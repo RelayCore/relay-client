@@ -37,6 +37,7 @@ import { useMembers } from "@/contexts/server-context";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useServer } from "@/contexts/server-context";
 import { EmojiPopup } from "./emoji-popup";
+import { CustomVideoPlayer } from "./video-player";
 
 export interface MessageChannelProps {
     channelId: number;
@@ -969,6 +970,7 @@ function AttachmentItem({
     onImageClick?: (attachment: Attachment) => void;
 }) {
     const isImage = attachment.type === "image";
+    const isVideo = attachment.type === "video";
     const fileSize = formatFileSize(attachment.file_size);
 
     // Open attachment in a new tab
@@ -1032,17 +1034,22 @@ function AttachmentItem({
         );
     }
 
+    if (isVideo) {
+        return (
+            <CustomVideoPlayer
+                attachment={attachment}
+                onDownload={handleDownload}
+            />
+        );
+    }
+
     return (
         <div
             className="border-border hover:bg-accent/10 flex cursor-pointer items-center gap-2 rounded-md border p-2"
             onClick={handleOpen}
         >
             <div className="bg-primary/10 rounded p-2">
-                {attachment.type === "video" ? (
-                    <ImageIcon size={20} />
-                ) : (
-                    <FileText size={20} />
-                )}
+                <FileText size={20} />
             </div>
             <div className="min-w-0 flex-grow">
                 <div className="truncate text-sm font-medium">
