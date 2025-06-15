@@ -484,9 +484,11 @@ function BaseLayoutContent({
                     <SidebarFooter>
                         <SidebarMenuItem>
                             <JoinServerDialog>
-                                <SidebarMenuButton tooltip="Add Server">
+                                <SidebarMenuButton tooltip="Join Server">
                                     <Plus />
-                                    <span className="truncate">Add Server</span>
+                                    <span className="truncate">
+                                        Join Server
+                                    </span>
                                 </SidebarMenuButton>
                             </JoinServerDialog>
                         </SidebarMenuItem>
