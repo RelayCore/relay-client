@@ -208,13 +208,45 @@ export interface UploadProfilePictureResponse {
     hash: string;
 }
 
+interface ApiRequestOptions {
+    method?: string;
+    body?: FormData | string;
+    headers?: Record<string, string>;
+    requiresAuth?: boolean;
+}
+
+async function apiRequest<T>(
+    serverUrl: string,
+    endpoint: string,
+    userId?: string,
+    options: ApiRequestOptions = {},
+): Promise<T> {
+    const { method = "GET", body, headers = {}, requiresAuth = true } = options;
+    const requestHeaders: Record<string, string> = { ...headers };
+
+    if (requiresAuth && userId) {
+        requestHeaders.Authorization = `Bearer ${userId}`;
+    }
+
+    const response = await fetch(`${serverUrl}${endpoint}`, {
+        method,
+        headers: requestHeaders,
+        body,
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Request failed: ${response.statusText}`);
+    }
+
+    return response.json();
+}
+
 // Get server metadata
 export async function getServerInfo(serverUrl: string): Promise<ServerInfo> {
-    const response = await fetch(`${serverUrl}/server`);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch server info: ${response.statusText}`);
-    }
-    return response.json();
+    return apiRequest<ServerInfo>(serverUrl, "/server", undefined, {
+        requiresAuth: false,
+    });
 }
 
 // Get all channels and groups
@@ -222,15 +254,11 @@ export async function getChannels(
     serverUrl: string,
     userId: string,
 ): Promise<{ groups: ChannelGroup[] }> {
-    const response = await fetch(`${serverUrl}/channels`, {
-        headers: {
-            Authorization: `Bearer ${userId}`,
-        },
-    });
-    if (!response.ok) {
-        throw new Error(`Failed to fetch channels: ${response.statusText}`);
-    }
-    return response.json();
+    return apiRequest<{ groups: ChannelGroup[] }>(
+        serverUrl,
+        "/channels",
+        userId,
+    );
 }
 
 // Get messages for a channel
@@ -241,18 +269,12 @@ export async function getChannelMessages(
     limit: number = 50,
     offset: number = 0,
 ): Promise<{ messages: Message[]; count: number }> {
-    const response = await fetch(
-        `${serverUrl}/channels/messages?channel_id=${channelId}&limit=${limit}&offset=${offset}`,
-        {
-            headers: {
-                Authorization: `Bearer ${userId}`,
-            },
-        },
+    const endpoint = `/channels/messages?channel_id=${channelId}&limit=${limit}&offset=${offset}`;
+    return apiRequest<{ messages: Message[]; count: number }>(
+        serverUrl,
+        endpoint,
+        userId,
     );
-    if (!response.ok) {
-        throw new Error(`Failed to fetch messages: ${response.statusText}`);
-    }
-    return response.json();
 }
 
 // Get all users
@@ -260,15 +282,11 @@ export async function getUsers(
     serverUrl: string,
     userId: string,
 ): Promise<{ users: User[]; count: number }> {
-    const response = await fetch(`${serverUrl}/users`, {
-        headers: {
-            Authorization: `Bearer ${userId}`,
-        },
-    });
-    if (!response.ok) {
-        throw new Error(`Failed to fetch users: ${response.statusText}`);
-    }
-    return response.json();
+    return apiRequest<{ users: User[]; count: number }>(
+        serverUrl,
+        "/users",
+        userId,
+    );
 }
 
 // Send a message with optional attachments
@@ -289,18 +307,10 @@ export async function sendMessageWithAttachments(
         });
     }
 
-    const response = await fetch(`${serverUrl}/messages/send`, {
+    return apiRequest<Message>(serverUrl, "/messages/send", userId, {
         method: "POST",
-        headers: {
-            Authorization: `Bearer ${userId}`,
-        },
         body: formData,
     });
-
-    if (!response.ok) {
-        throw new Error(`Failed to send message: ${response.statusText}`);
-    }
-    return response.json();
 }
 
 // Delete a message
@@ -309,20 +319,12 @@ export async function deleteMessage(
     userId: string,
     messageId: number,
 ): Promise<{ message: string; message_id: number; channel_id: number }> {
-    const response = await fetch(
-        `${serverUrl}/messages/delete?message_id=${messageId}`,
-        {
-            method: "DELETE",
-            headers: {
-                Authorization: `Bearer ${userId}`,
-            },
-        },
-    );
-
-    if (!response.ok) {
-        throw new Error(`Failed to delete message: ${response.statusText}`);
-    }
-    return response.json();
+    const endpoint = `/messages/delete?message_id=${messageId}`;
+    return apiRequest<{
+        message: string;
+        message_id: number;
+        channel_id: number;
+    }>(serverUrl, endpoint, userId, { method: "DELETE" });
 }
 
 export async function editMessage(
@@ -331,24 +333,14 @@ export async function editMessage(
     messageId: number,
     content: string,
 ): Promise<Message> {
-    const response = await fetch(`${serverUrl}/messages/edit`, {
+    return apiRequest<Message>(serverUrl, "/messages/edit", userId, {
         method: "PUT",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userId}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             message_id: messageId,
             content: content,
         }),
     });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to edit message");
-    }
-
-    return response.json();
 }
 
 // Create a new channel
@@ -357,21 +349,11 @@ export async function createChannel(
     userId: string,
     request: CreateChannelRequest,
 ): Promise<Channel> {
-    const response = await fetch(`${serverUrl}/channels/create`, {
+    return apiRequest<Channel>(serverUrl, "/channels/create", userId, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userId}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(request),
     });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to create channel");
-    }
-
-    return response.json();
 }
 
 // Update a channel
@@ -380,21 +362,11 @@ export async function updateChannel(
     userId: string,
     request: UpdateChannelRequest,
 ): Promise<Channel> {
-    const response = await fetch(`${serverUrl}/channels/update`, {
+    return apiRequest<Channel>(serverUrl, "/channels/update", userId, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userId}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(request),
     });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to update channel");
-    }
-
-    return response.json();
 }
 
 export async function deleteChannel(
@@ -402,18 +374,16 @@ export async function deleteChannel(
     userId: string,
     channelId: number,
 ): Promise<{ message: string }> {
-    const response = await fetch(`${serverUrl}/channels/delete`, {
-        method: "DELETE",
-        headers: {
-            Authorization: `Bearer ${userId}`,
+    return apiRequest<{ message: string }>(
+        serverUrl,
+        "/channels/delete",
+        userId,
+        {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ channel_id: channelId }),
         },
-        body: JSON.stringify({ channel_id: channelId }),
-    });
-
-    if (!response.ok) {
-        throw new Error(`Failed to delete channel: ${response.statusText}`);
-    }
-    return response.json();
+    );
 }
 
 // Get attachment URL for display/download
@@ -473,24 +443,19 @@ export async function updateUserNickname(
     targetUserId: string,
     nickname: string,
 ): Promise<{ message: string; user: User }> {
-    const response = await fetch(`${serverUrl}/user/nickname`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userId}`,
+    return apiRequest<{ message: string; user: User }>(
+        serverUrl,
+        "/user/nickname",
+        userId,
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                user_id: targetUserId,
+                nickname: nickname,
+            }),
         },
-        body: JSON.stringify({
-            user_id: targetUserId,
-            nickname: nickname,
-        }),
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to update nickname");
-    }
-
-    return response.json();
+    );
 }
 
 // Assign role to user
@@ -500,24 +465,14 @@ export async function assignRole(
     targetUserId: string,
     roleId: string,
 ): Promise<{ message: string }> {
-    const response = await fetch(`${serverUrl}/roles/assign`, {
+    return apiRequest<{ message: string }>(serverUrl, "/roles/assign", userId, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userId}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             user_id: targetUserId,
             role_id: roleId,
         }),
     });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to assign role");
-    }
-
-    return response.json();
 }
 
 // Remove role from user
@@ -527,24 +482,14 @@ export async function removeRole(
     targetUserId: string,
     roleId: string,
 ): Promise<{ message: string }> {
-    const response = await fetch(`${serverUrl}/roles/remove`, {
+    return apiRequest<{ message: string }>(serverUrl, "/roles/remove", userId, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userId}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             user_id: targetUserId,
             role_id: roleId,
         }),
     });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to remove role");
-    }
-
-    return response.json();
 }
 
 // Get channel permissions
@@ -553,22 +498,12 @@ export async function getChannelPermissions(
     userId: string,
     channelId: number,
 ): Promise<{ permissions: ChannelPermission[] }> {
-    const response = await fetch(
-        `${serverUrl}/channels/permissions?channel_id=${channelId}`,
-        {
-            headers: {
-                Authorization: `Bearer ${userId}`,
-            },
-        },
+    const endpoint = `/channels/permissions?channel_id=${channelId}`;
+    return apiRequest<{ permissions: ChannelPermission[] }>(
+        serverUrl,
+        endpoint,
+        userId,
     );
-
-    if (!response.ok) {
-        throw new Error(
-            `Failed to fetch channel permissions: ${response.statusText}`,
-        );
-    }
-
-    return response.json();
 }
 
 // Set channel permission
@@ -577,21 +512,16 @@ export async function setChannelPermission(
     userId: string,
     request: ChannelPermissionRequest,
 ): Promise<ChannelPermission> {
-    const response = await fetch(`${serverUrl}/channels/permissions/set`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userId}`,
+    return apiRequest<ChannelPermission>(
+        serverUrl,
+        "/channels/permissions/set",
+        userId,
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(request),
         },
-        body: JSON.stringify(request),
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to set channel permission");
-    }
-
-    return response.json();
+    );
 }
 
 // Delete channel permission
@@ -600,21 +530,16 @@ export async function deleteChannelPermission(
     userId: string,
     request: ChannelPermissionDeleteRequest,
 ): Promise<{ message: string }> {
-    const response = await fetch(`${serverUrl}/channels/permissions/delete`, {
-        method: "DELETE",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userId}`,
+    return apiRequest<{ message: string }>(
+        serverUrl,
+        "/channels/permissions/delete",
+        userId,
+        {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(request),
         },
-        body: JSON.stringify(request),
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to delete channel permission");
-    }
-
-    return response.json();
+    );
 }
 
 // Get all roles
@@ -622,16 +547,7 @@ export async function getRoles(
     serverUrl: string,
     userId: string,
 ): Promise<{ roles: Role[] }> {
-    const response = await fetch(`${serverUrl}/roles/list`, {
-        headers: {
-            Authorization: `Bearer ${userId}`,
-        },
-    });
-    if (!response.ok) {
-        throw new Error(`Failed to fetch roles: ${response.statusText}`);
-    }
-
-    const roles = await response.json();
+    const roles = await apiRequest<Role[]>(serverUrl, "/roles/list", userId);
     return { roles };
 }
 
@@ -747,20 +663,15 @@ export async function uploadServerIcon(
     const formData = new FormData();
     formData.append("icon", file);
 
-    const response = await fetch(`${serverUrl}/server/icon`, {
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${userId}`,
+    return apiRequest<{ message: string; icon_url: string }>(
+        serverUrl,
+        "/server/icon",
+        userId,
+        {
+            method: "POST",
+            body: formData,
         },
-        body: formData,
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to upload server icon");
-    }
-
-    return response.json();
+    );
 }
 
 // Create a new role
@@ -769,21 +680,11 @@ export async function createServerRole(
     userId: string,
     role: CreateRoleRequest,
 ): Promise<Role> {
-    const response = await fetch(`${serverUrl}/roles`, {
+    return apiRequest<Role>(serverUrl, "/roles", userId, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userId}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(role),
     });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to create role");
-    }
-
-    return response.json();
 }
 
 // Get invites
@@ -791,17 +692,11 @@ export async function getInvites(
     serverUrl: string,
     userId: string,
 ): Promise<{ invites: Invite[]; count: number }> {
-    const response = await fetch(`${serverUrl}/invites`, {
-        headers: {
-            Authorization: `Bearer ${userId}`,
-        },
-    });
-
-    if (!response.ok) {
-        throw new Error(`Failed to fetch invites: ${response.statusText}`);
-    }
-
-    return response.json();
+    return apiRequest<{ invites: Invite[]; count: number }>(
+        serverUrl,
+        "/invites",
+        userId,
+    );
 }
 
 // Create invite
@@ -810,21 +705,11 @@ export async function createServerInvite(
     userId: string,
     request: CreateInviteRequest,
 ): Promise<InviteResponse> {
-    const response = await fetch(`${serverUrl}/create-invite`, {
+    return apiRequest<InviteResponse>(serverUrl, "/create-invite", userId, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userId}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(request),
     });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to create invite");
-    }
-
-    return response.json();
 }
 
 // Delete invite
@@ -833,19 +718,10 @@ export async function deleteServerInvite(
     userId: string,
     code: string,
 ): Promise<{ message: string }> {
-    const response = await fetch(`${serverUrl}/invites/delete?code=${code}`, {
+    const endpoint = `/invites/delete?code=${code}`;
+    return apiRequest<{ message: string }>(serverUrl, endpoint, userId, {
         method: "DELETE",
-        headers: {
-            Authorization: `Bearer ${userId}`,
-        },
     });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to delete invite");
-    }
-
-    return response.json();
 }
 
 // Pin a message
@@ -854,23 +730,18 @@ export async function pinMessage(
     userId: string,
     messageId: number,
 ): Promise<{ status: string; message: string }> {
-    const response = await fetch(`${serverUrl}/messages/pin`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userId}`,
+    return apiRequest<{ status: string; message: string }>(
+        serverUrl,
+        "/messages/pin",
+        userId,
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                message_id: messageId,
+            }),
         },
-        body: JSON.stringify({
-            message_id: messageId,
-        }),
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to pin message");
-    }
-
-    return response.json();
+    );
 }
 
 // Unpin a message
@@ -879,23 +750,18 @@ export async function unpinMessage(
     userId: string,
     messageId: number,
 ): Promise<{ status: string; message: string }> {
-    const response = await fetch(`${serverUrl}/messages/unpin`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userId}`,
+    return apiRequest<{ status: string; message: string }>(
+        serverUrl,
+        "/messages/unpin",
+        userId,
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                message_id: messageId,
+            }),
         },
-        body: JSON.stringify({
-            message_id: messageId,
-        }),
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to unpin message");
-    }
-
-    return response.json();
+    );
 }
 
 // Get pinned messages for a channel
@@ -904,22 +770,12 @@ export async function getPinnedMessages(
     userId: string,
     channelId: number,
 ): Promise<{ pinned_messages: Message[]; count: number }> {
-    const response = await fetch(
-        `${serverUrl}/messages/pinned?channel_id=${channelId}`,
-        {
-            headers: {
-                Authorization: `Bearer ${userId}`,
-            },
-        },
+    const endpoint = `/messages/pinned?channel_id=${channelId}`;
+    return apiRequest<{ pinned_messages: Message[]; count: number }>(
+        serverUrl,
+        endpoint,
+        userId,
     );
-
-    if (!response.ok) {
-        throw new Error(
-            `Failed to fetch pinned messages: ${response.statusText}`,
-        );
-    }
-
-    return response.json();
 }
 
 // Helper function to check if user can pin messages in a channel
@@ -973,18 +829,13 @@ export async function uploadProfilePicture(
     const formData = new FormData();
     formData.append("profile_picture", file);
 
-    const response = await fetch(`${serverUrl}/user/profile-picture`, {
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${userId}`,
+    return apiRequest<UploadProfilePictureResponse>(
+        serverUrl,
+        "/user/profile-picture",
+        userId,
+        {
+            method: "POST",
+            body: formData,
         },
-        body: formData,
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to upload profile picture");
-    }
-
-    return response.json();
+    );
 }
