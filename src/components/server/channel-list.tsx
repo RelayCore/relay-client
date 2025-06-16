@@ -35,6 +35,7 @@ import { ChannelContextMenu } from "./channel-context-menu";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import EditChannelDialog from "./edit-channel-dialog";
 import { UserAvatar } from "./user-avatar";
+import { VoiceUserContextMenu } from "./voice-user-context-menu";
 
 interface ExpandedGroup extends ChannelGroup {
     expanded: boolean;
@@ -517,73 +518,84 @@ function ChannelItem({
                 voiceState.participants.length > 0 && (
                     <div className="mt-1 mb-2 ml-2 space-y-1">
                         {voiceState.participants.map((participant) => (
-                            <div
+                            <VoiceUserContextMenu
                                 key={participant.user_id}
-                                className={cn(
-                                    "flex items-center justify-between rounded-md px-2 py-1.5 text-xs transition-colors",
-                                    "hover:bg-accent/20",
-                                    participant.is_speaking &&
-                                        "bg-green-500/10",
-                                )}
+                                participant={participant}
+                                openProfile={() => {
+                                    // Handle opening user profile
+                                    console.log(
+                                        "Open profile for:",
+                                        participant.username,
+                                    );
+                                }}
                             >
-                                <div className="flex min-w-0 flex-1 items-center gap-2">
-                                    <div className="relative">
-                                        <UserAvatar
-                                            displayName={
-                                                participant.nickname ||
-                                                participant.username
-                                            }
-                                            profilePictureUrl={
-                                                participant.profile_picture_url
-                                            }
-                                            className={cn(
-                                                "h-6 w-6 text-xs",
-                                                participant.is_speaking
-                                                    ? "ring-2 ring-green-400/50"
-                                                    : "",
+                                <div
+                                    className={cn(
+                                        "flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-xs transition-colors",
+                                        "hover:bg-accent/20",
+                                        participant.is_speaking &&
+                                            "bg-green-500/10",
+                                    )}
+                                >
+                                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                                        <div className="relative">
+                                            <UserAvatar
+                                                displayName={
+                                                    participant.nickname ||
+                                                    participant.username
+                                                }
+                                                profilePictureUrl={
+                                                    participant.profile_picture_url
+                                                }
+                                                className={cn(
+                                                    "h-6 w-6 text-xs",
+                                                    participant.is_speaking
+                                                        ? "ring-2 ring-green-400/50"
+                                                        : "",
+                                                )}
+                                            />
+                                            {participant.is_speaking && (
+                                                <div className="absolute -inset-0.5 animate-pulse rounded-full bg-green-400 opacity-75" />
                                             )}
-                                        />
-                                        {participant.is_speaking && (
-                                            <div className="absolute -inset-0.5 animate-pulse rounded-full bg-green-400 opacity-75" />
-                                        )}
+                                        </div>
+                                        <span
+                                            className={cn(
+                                                "truncate font-medium",
+                                                participant.is_speaking
+                                                    ? "text-green-400"
+                                                    : "text-muted-foreground",
+                                            )}
+                                        >
+                                            {participant.nickname ||
+                                                participant.username}
+                                        </span>
                                     </div>
-                                    <span
-                                        className={cn(
-                                            "truncate font-medium",
-                                            participant.is_speaking
-                                                ? "text-green-400"
-                                                : "text-muted-foreground",
-                                        )}
-                                    >
-                                        {participant.nickname ||
-                                            participant.username}
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    {participant.is_deafened ? (
-                                        <div className="flex items-center gap-0.5">
-                                            <Headphones
+                                    <div className="flex items-center gap-1">
+                                        {participant.is_deafened ? (
+                                            <div className="flex items-center gap-0.5">
+                                                <Headphones
+                                                    size={12}
+                                                    className="text-red-400"
+                                                />
+                                                <MicOff
+                                                    size={10}
+                                                    className="text-red-400"
+                                                />
+                                            </div>
+                                        ) : participant.is_muted ? (
+                                            <MicOff
                                                 size={12}
                                                 className="text-red-400"
                                             />
-                                            <MicOff
-                                                size={10}
-                                                className="text-red-400"
+                                        ) : (
+                                            <Mic
+                                                size={12}
+                                                className="text-muted-foreground/60"
                                             />
-                                        </div>
-                                    ) : participant.is_muted ? (
-                                        <MicOff
-                                            size={12}
-                                            className="text-red-400"
-                                        />
-                                    ) : (
-                                        <Mic
-                                            size={12}
-                                            className="text-muted-foreground/60"
-                                        />
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
+                            </VoiceUserContextMenu>
                         ))}
                     </div>
                 )}

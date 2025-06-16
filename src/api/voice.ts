@@ -1,27 +1,7 @@
 import { ServerRecord } from "@/storage/server-store";
 import { getSetting, SettingsInterface } from "@/utils/settings";
 import { WebSocketMessage } from "@/websocket/websocket-manager";
-
-// Types
-export interface VoiceParticipant {
-    id: number;
-    user_id: string;
-    username: string;
-    nickname: string;
-    is_muted: boolean;
-    is_deafened: boolean;
-    is_speaking: boolean;
-    joined_at: string;
-}
-
-export interface VoiceRoom {
-    id: number;
-    channel_id: number;
-    channel_name: string;
-    is_active: boolean;
-    participants: VoiceParticipant[];
-    created_at: string;
-}
+import { VoiceParticipant } from "./server";
 
 export interface VoiceJoinResponse {
     status: string;
@@ -668,7 +648,7 @@ export class VoiceAudioManager {
 // Main Voice Client - Updated for WebRTC
 export class VoiceClient {
     private api: VoiceAPI;
-    private audioManager: VoiceAudioManager;
+    public audioManager: VoiceAudioManager;
 
     private currentChannelId: number | null = null;
     private participants = new Map<string, VoiceParticipant>();

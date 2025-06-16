@@ -295,7 +295,7 @@ interface EditNicknameModalProps {
     onClose: () => void;
 }
 
-function EditNicknameModal({ user, open, onClose }: EditNicknameModalProps) {
+export function EditNicknameModal({ user, open, onClose }: EditNicknameModalProps) {
     const { userId } = useCurrentUser();
     const { serverRecord, refreshServerData } = useServer();
     const [nickname, setNickname] = useState(user.nickname);
