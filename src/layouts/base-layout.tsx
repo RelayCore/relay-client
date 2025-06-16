@@ -364,6 +364,14 @@ function BaseLayoutContent({
 
     const getSegmentDisplayName = (segment: string) => {
         const decodedSegment = decodeURIComponent(segment);
+
+        const matchingServer = servers.find(
+            (server) => server.user_id === decodedSegment,
+        );
+        if (matchingServer) {
+            return getServerDisplayName(matchingServer);
+        }
+
         return decodedSegment.charAt(0).toUpperCase() + decodedSegment.slice(1);
     };
 
