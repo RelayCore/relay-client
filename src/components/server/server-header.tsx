@@ -100,7 +100,7 @@ export default function ServerHeader({
     return (
         <header
             className={cn(
-                "bg-background relative flex h-12 items-center justify-between border-b px-3",
+                `bg-background relative flex h-12 items-center justify-between border-b pr-3 ${isOnSettingsPage ? "pl-[0.3rem]" : "pl-3"}`,
                 className,
             )}
         >
