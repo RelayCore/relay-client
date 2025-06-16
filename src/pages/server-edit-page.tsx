@@ -275,6 +275,7 @@ export default function ServerEditPage() {
         color: "#5865F2",
         rank: 100,
         permissions: PERMISSION_PRESETS.member.permissions as Permission[],
+        display_role_members: true,
     });
     const [editRole, setEditRole] = useState<{
         id: string;
@@ -282,6 +283,7 @@ export default function ServerEditPage() {
         color: string;
         rank: number;
         permissions: Permission[];
+        display_role_members: boolean;
     } | null>(null);
 
     useEffect(() => {
@@ -501,6 +503,7 @@ export default function ServerEditPage() {
                 permissions: newRole.permissions,
                 rank: newRole.rank,
                 assignable: true,
+                display_role_members: newRole.display_role_members,
             };
 
             await createServerRole(
@@ -521,6 +524,7 @@ export default function ServerEditPage() {
                 color: "#5865F2",
                 rank: 100,
                 permissions: [],
+                display_role_members: true,
             });
             clearServerStatusCache();
         } catch (error) {
@@ -540,6 +544,7 @@ export default function ServerEditPage() {
             color: role.color,
             rank: role.rank,
             permissions: [...role.permissions],
+            display_role_members: role.display_role_members,
         });
         setEditingRole(role.id);
     };
@@ -554,6 +559,7 @@ export default function ServerEditPage() {
                 color: editRole.color,
                 rank: editRole.rank,
                 permissions: editRole.permissions,
+                display_role_members: editRole.display_role_members,
             };
 
             await updateServerRole(
@@ -970,6 +976,32 @@ export default function ServerEditPage() {
                                             </div>
                                         </div>
 
+                                        {/* Display Role Members Toggle */}
+                                        <div className="flex items-center justify-between rounded-lg border p-4">
+                                            <div>
+                                                <Label htmlFor="new-display-members">
+                                                    Display Role Members
+                                                </Label>
+                                                <p className="text-muted-foreground text-sm">
+                                                    Show users with this role in
+                                                    the member list
+                                                </p>
+                                            </div>
+                                            <Switch
+                                                id="new-display-members"
+                                                checked={
+                                                    newRole.display_role_members
+                                                }
+                                                onCheckedChange={(checked) =>
+                                                    setNewRole((prev) => ({
+                                                        ...prev,
+                                                        display_role_members:
+                                                            checked,
+                                                    }))
+                                                }
+                                            />
+                                        </div>
+
                                         {/* Permission presets and permissions for new role */}
                                         <div className="space-y-4">
                                             <div className="space-y-2">
@@ -1197,6 +1229,51 @@ export default function ServerEditPage() {
                                                                 </div>
                                                             </div>
 
+                                                            {/* Display Role Members Toggle for Edit */}
+                                                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                                                <div>
+                                                                    <Label
+                                                                        htmlFor={`edit-display-members-${role.id}`}
+                                                                    >
+                                                                        Display
+                                                                        Role
+                                                                        Members
+                                                                    </Label>
+                                                                    <p className="text-muted-foreground text-sm">
+                                                                        Show
+                                                                        users
+                                                                        with
+                                                                        this
+                                                                        role in
+                                                                        the
+                                                                        member
+                                                                        list
+                                                                    </p>
+                                                                </div>
+                                                                <Switch
+                                                                    id={`edit-display-members-${role.id}`}
+                                                                    checked={
+                                                                        editRole.display_role_members
+                                                                    }
+                                                                    onCheckedChange={(
+                                                                        checked,
+                                                                    ) =>
+                                                                        setEditRole(
+                                                                            (
+                                                                                prev,
+                                                                            ) =>
+                                                                                prev
+                                                                                    ? {
+                                                                                          ...prev,
+                                                                                          display_role_members:
+                                                                                              checked,
+                                                                                      }
+                                                                                    : null,
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </div>
+
                                                             <div className="space-y-2">
                                                                 <Label>
                                                                     Permissions
@@ -1328,6 +1405,13 @@ export default function ServerEditPage() {
                                                                                 .length
                                                                         }{" "}
                                                                         permissions
+                                                                        {!role.display_role_members && (
+                                                                            <span className="text-amber-600">
+                                                                                {
+                                                                                    " • Hidden in member list"
+                                                                                }
+                                                                            </span>
+                                                                        )}
                                                                     </p>
                                                                 </div>
                                                             </div>

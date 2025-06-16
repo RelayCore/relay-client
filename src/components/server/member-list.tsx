@@ -42,6 +42,11 @@ export default function MemberList({
 
                 // Only online members for role groups
                 sortedRoles.forEach((role) => {
+                    // Skip roles that shouldn't display their members
+                    if (role.display_role_members === false) {
+                        return;
+                    }
+
                     const roleMembers = members.filter(
                         (member) =>
                             member.is_online &&

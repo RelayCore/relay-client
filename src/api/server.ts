@@ -127,6 +127,7 @@ export interface Role {
     rank: number;
     permissions: Permission[];
     assignable: boolean;
+    display_role_members: boolean;
 }
 
 export interface CreateChannelRequest {
@@ -201,6 +202,7 @@ export interface CreateRoleRequest {
     permissions: Permission[];
     rank: number;
     assignable: boolean;
+    display_role_members: boolean;
 }
 
 export interface UpdateRoleRequest {
@@ -209,6 +211,7 @@ export interface UpdateRoleRequest {
     color?: string;
     rank?: number;
     permissions?: Permission[];
+    display_role_members?: boolean;
 }
 
 export interface CreateInviteRequest {
