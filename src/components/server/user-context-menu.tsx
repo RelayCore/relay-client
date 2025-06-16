@@ -25,7 +25,6 @@ import {
     UserX,
     Edit3,
     Copy,
-    AlertTriangle,
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useServer } from "@/contexts/server-context";
@@ -82,7 +81,7 @@ export function UserContextMenu({
     );
 
     const removableRoles = user.roles?.filter(
-        (role) => role.id !== "admin" && role.rank < userHighestRank,
+        (role) => role.id !== "owner" && role.rank < userHighestRank,
     );
 
     const handleEditNickname = () => {
@@ -155,7 +154,7 @@ export function UserContextMenu({
                     )}
 
                     {/* Role Management */}
-                    {canAssignRoles && !isOwnProfile && (
+                    {canAssignRoles && (
                         <>
                             <ContextMenuSeparator />
                             <ContextMenuSub>
@@ -250,18 +249,6 @@ export function UserContextMenu({
                         </>
                     )}
 
-                    {/* Admin Actions */}
-                    {currentUser?.roles?.some((role) => role.id === "admin") &&
-                        !isOwnProfile && (
-                            <>
-                                <ContextMenuSeparator />
-                                <ContextMenuItem variant="destructive">
-                                    <AlertTriangle className="mr-2 h-4 w-4" />
-                                    Transfer Ownership
-                                </ContextMenuItem>
-                            </>
-                        )}
-
                     <ContextMenuSeparator />
 
                     {/* Copy Actions */}
@@ -295,7 +282,11 @@ interface EditNicknameModalProps {
     onClose: () => void;
 }
 
-export function EditNicknameModal({ user, open, onClose }: EditNicknameModalProps) {
+export function EditNicknameModal({
+    user,
+    open,
+    onClose,
+}: EditNicknameModalProps) {
     const { userId } = useCurrentUser();
     const { serverRecord, refreshServerData } = useServer();
     const [nickname, setNickname] = useState(user.nickname);
