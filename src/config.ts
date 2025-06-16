@@ -11,7 +11,7 @@ export const APP_CONFIG = {
     name: "Relay",
     protocolName: "relay",
     author: "sn0w12",
-    repo: "sn0w12/relay-client",
+    repo: "RelayCore/relay-client",
     useLoadingWindow: true,
 };
 
