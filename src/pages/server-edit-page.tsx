@@ -717,7 +717,7 @@ export default function ServerEditPage() {
                                     {/* Server Icon */}
                                     <div className="flex items-center space-x-4">
                                         <div className="relative">
-                                            <Avatar className="h-20 w-20">
+                                            <Avatar className="h-20 w-20 rounded-sm">
                                                 <AvatarImage
                                                     src={serverInfo?.icon}
                                                 />
@@ -729,7 +729,7 @@ export default function ServerEditPage() {
                                             </Avatar>
                                             <Label
                                                 htmlFor="icon-upload"
-                                                className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/50 text-white opacity-0 transition-opacity hover:opacity-100"
+                                                className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-sm bg-black/50 text-white opacity-0 transition-opacity hover:opacity-100"
                                             >
                                                 <Upload className="h-5 w-5" />
                                             </Label>
