@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Upload, Download, X } from "lucide-react";
 import { updateAvatarOnAllServers } from "@/api/profile-picture";
+import { APP_CONFIG } from "@/config";
 
 interface AvatarCropperProps {
     value: string;
@@ -385,7 +386,7 @@ export function AvatarCropper({ value }: AvatarCropperProps) {
             }
             const appDataPath = pathsResult.data.appData;
             const fileName = "avatar.png";
-            const filePath = `${appDataPath}\\${fileName}`;
+            const filePath = `${appDataPath}\\${APP_CONFIG.name}\\${fileName}`;
 
             // Extract pure base64 data from the data URL
             const base64Data = croppedDataUrl.replace(
