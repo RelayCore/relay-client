@@ -203,6 +203,14 @@ export interface CreateRoleRequest {
     assignable: boolean;
 }
 
+export interface UpdateRoleRequest {
+    id: string;
+    name?: string;
+    color?: string;
+    rank?: number;
+    permissions?: Permission[];
+}
+
 export interface CreateInviteRequest {
     created_by: string;
     expires_in: number;
@@ -235,6 +243,25 @@ interface ApiRequestOptions {
     body?: FormData | string;
     headers?: Record<string, string>;
     requiresAuth?: boolean;
+}
+
+export interface UpdateServerConfigRequest {
+    name?: string;
+    description?: string;
+    allow_invite?: boolean;
+    max_users?: number;
+    max_file_size?: number;
+    max_attachments?: number;
+}
+
+export interface UpdateServerConfigResponse {
+    message: string;
+    name: string;
+    description: string;
+    allow_invite: boolean;
+    max_users: number;
+    max_file_size: number;
+    max_attachments: number;
 }
 
 async function apiRequest<T>(
@@ -709,6 +736,32 @@ export async function createServerRole(
     });
 }
 
+// Update a role
+export async function updateServerRole(
+    serverUrl: string,
+    userId: string,
+    role: UpdateRoleRequest,
+): Promise<Role> {
+    return apiRequest<Role>(serverUrl, "/roles/update", userId, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(role),
+    });
+}
+
+// Delete a role
+export async function deleteServerRole(
+    serverUrl: string,
+    userId: string,
+    roleId: string,
+): Promise<{ message: string }> {
+    return apiRequest<{ message: string }>(serverUrl, "/roles/delete", userId, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: roleId }),
+    });
+}
+
 // Get invites
 export async function getInvites(
     serverUrl: string,
@@ -896,4 +949,22 @@ export async function searchMessages(
         count: number;
         query: string;
     }>(serverUrl, endpoint, userId);
+}
+
+// Update server configuration
+export async function updateServerConfig(
+    serverUrl: string,
+    userId: string,
+    config: UpdateServerConfigRequest,
+): Promise<UpdateServerConfigResponse> {
+    return apiRequest<UpdateServerConfigResponse>(
+        serverUrl,
+        "/server/config",
+        userId,
+        {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(config),
+        },
+    );
 }

@@ -12,84 +12,382 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { ColorPicker } from "@/components/ui/color-picker";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
     Upload,
     Settings,
+    Save,
+    UserPlus,
+    Copy,
     Trash2,
     Plus,
     Crown,
-    UserPlus,
-    Copy,
+    Edit2,
+    Check,
     X,
 } from "lucide-react";
 import {
     ServerInfo,
-    removeRole,
-    getInvites,
     uploadServerIcon,
-    createServerRole,
+    updateServerConfig,
+    UpdateServerConfigRequest,
+    getInvites,
     createServerInvite,
     deleteServerInvite,
+    Invite,
+    Role,
+    Permission,
+    createServerRole,
+    updateServerRole,
+    deleteServerRole,
+    CreateRoleRequest,
+    UpdateRoleRequest,
 } from "@/api/server";
 import { useServer, useServerRecord } from "@/contexts/server-context";
 import { useNavigate } from "@tanstack/react-router";
 import ServerHeader from "@/components/server/server-header";
+import { useConfirm } from "@/contexts/confirm-context";
 
-interface Invite {
-    code: string;
-    created_by: string;
-    created_at: string;
-    expires_at?: string;
-    max_uses: number;
-    uses: number;
-}
+// Available permissions grouped by category
+const PERMISSION_GROUPS: {
+    category: string;
+    permissions: {
+        value: Permission;
+        label: string;
+        description: string;
+    }[];
+}[] = [
+    {
+        category: "Messages",
+        permissions: [
+            {
+                value: "send_messages",
+                label: "Send Messages",
+                description: "Allow sending messages in channels",
+            },
+            {
+                value: "read_messages",
+                label: "Read Messages",
+                description: "Allow reading messages in channels",
+            },
+        ],
+    },
+    {
+        category: "Invites",
+        permissions: [
+            {
+                value: "create_invites",
+                label: "Create Invites",
+                description: "Allow creating server invites",
+            },
+            {
+                value: "manage_invites",
+                label: "Manage Invites",
+                description: "Allow managing server invites",
+            },
+        ],
+    },
+    {
+        category: "Channels",
+        permissions: [
+            {
+                value: "create_channels",
+                label: "Create Channels",
+                description: "Allow creating new channels",
+            },
+            {
+                value: "delete_channels",
+                label: "Delete Channels",
+                description: "Allow deleting channels",
+            },
+            {
+                value: "manage_channels",
+                label: "Manage Channels",
+                description: "Allow editing channel settings",
+            },
+        ],
+    },
+    {
+        category: "Voice",
+        permissions: [
+            {
+                value: "join_voice",
+                label: "Join Voice",
+                description: "Allow joining voice channels",
+            },
+            {
+                value: "speak_in_voice",
+                label: "Speak in Voice",
+                description: "Allow speaking in voice channels",
+            },
+            {
+                value: "manage_voice",
+                label: "Manage Voice",
+                description: "Allow managing voice channels",
+            },
+        ],
+    },
+    {
+        category: "Moderation",
+        permissions: [
+            {
+                value: "kick_users",
+                label: "Kick Users",
+                description: "Allow kicking users from server",
+            },
+            {
+                value: "ban_users",
+                label: "Ban Users",
+                description: "Allow banning users from server",
+            },
+            {
+                value: "manage_users",
+                label: "Manage Users",
+                description: "Allow managing user settings",
+            },
+        ],
+    },
+    {
+        category: "Administration",
+        permissions: [
+            {
+                value: "assign_roles",
+                label: "Assign Roles",
+                description: "Allow assigning roles to users",
+            },
+            {
+                value: "manage_server",
+                label: "Manage Server",
+                description: "Allow managing server settings",
+            },
+            {
+                value: "manage_roles",
+                label: "Manage Roles",
+                description: "Allow managing server roles",
+            },
+            {
+                value: "view_audit_log",
+                label: "View Audit Log",
+                description: "Allow viewing server audit logs",
+            },
+        ],
+    },
+];
+
+// Permission presets for quick role creation
+const PERMISSION_PRESETS = {
+    admin: {
+        name: "Administrator",
+        permissions: [
+            "send_messages",
+            "read_messages",
+            "create_invites",
+            "manage_invites",
+            "create_channels",
+            "delete_channels",
+            "manage_channels",
+            "join_voice",
+            "speak_in_voice",
+            "manage_voice",
+            "kick_users",
+            "ban_users",
+            "manage_users",
+            "assign_roles",
+            "manage_server",
+            "manage_roles",
+            "view_audit_log",
+        ] as Permission[],
+    },
+    moderator: {
+        name: "Moderator",
+        permissions: [
+            "send_messages",
+            "read_messages",
+            "create_invites",
+            "manage_channels",
+            "join_voice",
+            "speak_in_voice",
+            "manage_voice",
+            "kick_users",
+            "manage_users",
+            "view_audit_log",
+        ] as Permission[],
+    },
+    member: {
+        name: "Member",
+        permissions: [
+            "send_messages",
+            "read_messages",
+            "join_voice",
+            "speak_in_voice",
+        ] as Permission[],
+    },
+    guest: {
+        name: "Guest",
+        permissions: ["read_messages", "join_voice"] as Permission[],
+    },
+};
 
 export default function ServerEditPage() {
     const {
         serverInfo,
-        users,
-        roles,
+        roles: contextRoles,
         refreshServerData,
         clearServerStatusCache,
         loading: contextLoading,
     } = useServer();
     const serverRecord = useServerRecord();
     const navigate = useNavigate();
+    const { confirm } = useConfirm();
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [invites, setInvites] = useState<Invite[]>([]);
-
-    // Form states
     const [formData, setFormData] = useState<Partial<ServerInfo>>({});
-    const [newRole, setNewRole] = useState({ name: "", color: "#5865F2" });
-    const [newInvite, setNewInvite] = useState({ expires_in: 24, max_uses: 0 });
+
+    // Local roles state to prevent re-renders
+    const [roles, setRoles] = useState<Role[]>([]);
+
+    // Invite management state
+    const [invites, setInvites] = useState<Invite[]>([]);
+    const [loadingInvites, setLoadingInvites] = useState(false);
+    const [creatingInvite, setCreatingInvite] = useState(false);
+    const [newInvite, setNewInvite] = useState({
+        expires_in: 24,
+        max_uses: 0,
+    });
+
+    // Role management state
+    const [editingRole, setEditingRole] = useState<string | null>(null);
+    const [creatingRole, setCreatingRole] = useState(false);
+    const [newRole, setNewRole] = useState({
+        name: "",
+        color: "#5865F2",
+        rank: 100,
+        permissions: PERMISSION_PRESETS.member.permissions as Permission[],
+    });
+    const [editRole, setEditRole] = useState<{
+        id: string;
+        name: string;
+        color: string;
+        rank: number;
+        permissions: Permission[];
+    } | null>(null);
 
     useEffect(() => {
         if (serverInfo) {
-            setFormData(serverInfo);
+            setFormData({
+                ...serverInfo,
+                max_file_size: Math.round(
+                    serverInfo.max_file_size / (1024 * 1024),
+                ),
+            });
             setLoading(false);
         }
-        loadInvites();
     }, [serverInfo]);
 
+    // Sync roles from context to local state
+    useEffect(() => {
+        if (contextRoles) {
+            setRoles(contextRoles);
+        }
+    }, [contextRoles]);
+
+    // Load invites when invites tab is accessed
     const loadInvites = async () => {
-        if (!serverRecord) return;
+        if (!serverRecord || loadingInvites) return;
 
         try {
+            setLoadingInvites(true);
             const response = await getInvites(
                 serverRecord.server_url,
-                serverRecord.user_id, // Changed from serverRecord.id
+                serverRecord.user_id,
             );
             setInvites(response.invites || []);
         } catch (error) {
             console.error("Failed to load invites:", error);
+            toast.error("Failed to load invites");
+        } finally {
+            setLoadingInvites(false);
         }
+    };
+
+    const handleCreateInvite = async () => {
+        if (!serverRecord || creatingInvite) return;
+
+        try {
+            setCreatingInvite(true);
+
+            const inviteResponse = await createServerInvite(
+                serverRecord.server_url,
+                serverRecord.user_id,
+                {
+                    created_by: serverRecord.user_id,
+                    expires_in: newInvite.expires_in,
+                    max_uses: newInvite.max_uses,
+                },
+            );
+
+            // Create the new invite object with proper structure
+            const newInviteItem: Invite = {
+                code: inviteResponse.invite_code,
+                created_by: serverRecord.user_id,
+                created_at: new Date().toISOString(),
+                expires_at: inviteResponse.expires_at,
+                max_uses: inviteResponse.max_uses,
+                uses: 0,
+            };
+
+            // Optimistically update the UI
+            setInvites((prev) => [newInviteItem, ...prev]);
+
+            toast.success("Invite created successfully");
+
+            // Reset form
+            setNewInvite({ expires_in: 24, max_uses: 0 });
+        } catch (error) {
+            console.error("Failed to create invite:", error);
+            toast.error("Failed to create invite");
+        } finally {
+            setCreatingInvite(false);
+        }
+    };
+
+    const handleDeleteInvite = async (code: string) => {
+        if (!serverRecord) return;
+
+        try {
+            // Optimistically remove from UI
+            setInvites((prev) => prev.filter((invite) => invite.code !== code));
+
+            await deleteServerInvite(
+                serverRecord.server_url,
+                serverRecord.user_id,
+                code,
+            );
+
+            toast.success("Invite deleted successfully");
+        } catch (error) {
+            console.error("Failed to delete invite:", error);
+            toast.error("Failed to delete invite");
+            // Reload invites on error to restore state
+            loadInvites();
+        }
+    };
+
+    const copyInviteCode = (code: string) => {
+        navigator.clipboard.writeText(code);
+        toast.success("Invite code copied to clipboard");
     };
 
     const handleIconUpload = async (
@@ -115,95 +413,234 @@ export default function ServerEditPage() {
         }
     };
 
-    const createRole = async () => {
-        if (!newRole.name.trim() || !serverRecord) return;
+    const saveServerConfig = async () => {
+        if (!serverRecord) return;
 
         try {
-            await createServerRole(
+            setSaving(true);
+            const configUpdate: UpdateServerConfigRequest = {
+                name: formData.name,
+                description: formData.description,
+                allow_invite: formData.allow_invite,
+                max_users: formData.max_users,
+                max_file_size: formData.max_file_size,
+                max_attachments: formData.max_attachments,
+            };
+
+            await updateServerConfig(
                 serverRecord.server_url,
                 serverRecord.user_id,
-                {
-                    id: newRole.name.toLowerCase().replace(/\s+/g, "-"),
-                    name: newRole.name,
-                    color: newRole.color,
-                    permissions: [],
-                    rank: 100,
-                    assignable: true,
-                },
+                configUpdate,
             );
-            toast.success("Role created successfully");
-            setNewRole({ name: "", color: "#5865F2" });
+
+            toast.success("Server configuration updated successfully");
             clearServerStatusCache();
             refreshServerData();
         } catch {
-            toast.error("Failed to create role");
+            toast.error("Failed to update server configuration");
+        } finally {
+            setSaving(false);
         }
-    };
-
-    const handleRemoveRole = async (userId: string, roleId: string) => {
-        if (!serverRecord) return;
-
-        try {
-            await removeRole(
-                serverRecord.server_url,
-                serverRecord.user_id,
-                userId,
-                roleId,
-            );
-            toast.success("Role removed successfully");
-            clearServerStatusCache();
-            refreshServerData();
-        } catch {
-            toast.error("Failed to remove role");
-        }
-    };
-
-    const createInvite = async () => {
-        if (!serverRecord) return;
-
-        try {
-            await createServerInvite(
-                serverRecord.server_url,
-                serverRecord.user_id,
-                {
-                    // Changed from serverRecord.id
-                    created_by: serverRecord.user_id, // Changed from serverRecord.id
-                    expires_in: newInvite.expires_in,
-                    max_uses: newInvite.max_uses,
-                },
-            );
-            toast.success("Invite created successfully");
-            loadInvites();
-        } catch {
-            toast.error("Failed to create invite");
-        }
-    };
-
-    const deleteInvite = async (code: string) => {
-        if (!serverRecord) return;
-
-        try {
-            await deleteServerInvite(
-                serverRecord.server_url,
-                serverRecord.user_id, // Changed from serverRecord.id
-                code,
-            );
-            toast.success("Invite deleted successfully");
-            loadInvites();
-        } catch {
-            toast.error("Failed to delete invite");
-        }
-    };
-
-    const copyInviteCode = (code: string) => {
-        navigator.clipboard.writeText(code);
-        toast.success("Invite code copied to clipboard");
     };
 
     const handleBackClick = () => {
         navigate({
             to: `/servers/${serverRecord?.user_id}`,
         });
+    };
+
+    // Add preset selection function
+    const applyPermissionPreset = (
+        presetKey: keyof typeof PERMISSION_PRESETS,
+        isNewRole = true,
+    ) => {
+        const preset = PERMISSION_PRESETS[presetKey];
+        if (isNewRole) {
+            setNewRole((prev) => ({
+                ...prev,
+                permissions: [...preset.permissions],
+            }));
+        } else if (editRole) {
+            setEditRole((prev) =>
+                prev
+                    ? {
+                          ...prev,
+                          permissions: [...preset.permissions],
+                      }
+                    : null,
+            );
+        }
+    };
+
+    // Helper function to check if current permissions match a preset
+    const getActivePreset = (
+        permissions: Permission[],
+    ): keyof typeof PERMISSION_PRESETS | null => {
+        for (const [key, preset] of Object.entries(PERMISSION_PRESETS)) {
+            if (
+                permissions.length === preset.permissions.length &&
+                permissions.every((p) => preset.permissions.includes(p))
+            ) {
+                return key as keyof typeof PERMISSION_PRESETS;
+            }
+        }
+        return null;
+    };
+
+    // Role management functions
+    const handleCreateRole = async () => {
+        if (!newRole.name.trim() || !serverRecord || creatingRole) return;
+
+        try {
+            setCreatingRole(true);
+
+            const roleRequest: CreateRoleRequest = {
+                id: newRole.name.toLowerCase().replace(/\s+/g, "-"),
+                name: newRole.name,
+                color: newRole.color,
+                permissions: newRole.permissions,
+                rank: newRole.rank,
+                assignable: true,
+            };
+
+            await createServerRole(
+                serverRecord.server_url,
+                serverRecord.user_id,
+                roleRequest,
+            );
+
+            // Optimistically update local roles state
+            const newRoleObject: Role = {
+                ...roleRequest,
+            };
+            setRoles((prev) => [...prev, newRoleObject]);
+
+            toast.success("Role created successfully");
+            setNewRole({
+                name: "",
+                color: "#5865F2",
+                rank: 100,
+                permissions: [],
+            });
+            clearServerStatusCache();
+        } catch (error) {
+            console.error("Failed to create role:", error);
+            toast.error("Failed to create role");
+            // Only refresh on error to sync with server
+            refreshServerData();
+        } finally {
+            setCreatingRole(false);
+        }
+    };
+
+    const handleEditRole = (role: Role) => {
+        setEditRole({
+            id: role.id,
+            name: role.name,
+            color: role.color,
+            rank: role.rank,
+            permissions: [...role.permissions],
+        });
+        setEditingRole(role.id);
+    };
+
+    const handleSaveRole = async () => {
+        if (!editRole || !serverRecord) return;
+
+        try {
+            const updateRequest: UpdateRoleRequest = {
+                id: editRole.id,
+                name: editRole.name,
+                color: editRole.color,
+                rank: editRole.rank,
+                permissions: editRole.permissions,
+            };
+
+            await updateServerRole(
+                serverRecord.server_url,
+                serverRecord.user_id,
+                updateRequest,
+            );
+
+            // Optimistically update local roles state
+            setRoles((prev) =>
+                prev.map((role) =>
+                    role.id === editRole.id
+                        ? { ...role, ...updateRequest }
+                        : role,
+                ),
+            );
+
+            toast.success("Role updated successfully");
+            setEditingRole(null);
+            setEditRole(null);
+            clearServerStatusCache();
+        } catch (error) {
+            console.error("Failed to update role:", error);
+            toast.error("Failed to update role");
+            // Only refresh on error to sync with server
+            refreshServerData();
+        }
+    };
+
+    const handleCancelEdit = () => {
+        setEditingRole(null);
+        setEditRole(null);
+    };
+
+    const togglePermission = (permission: Permission, isNewRole = false) => {
+        if (isNewRole) {
+            setNewRole((prev) => ({
+                ...prev,
+                permissions: prev.permissions.includes(permission)
+                    ? prev.permissions.filter((p) => p !== permission)
+                    : [...prev.permissions, permission],
+            }));
+        } else if (editRole) {
+            setEditRole((prev) =>
+                prev
+                    ? {
+                          ...prev,
+                          permissions: prev.permissions.includes(permission)
+                              ? prev.permissions.filter((p) => p !== permission)
+                              : [...prev.permissions, permission],
+                      }
+                    : null,
+            );
+        }
+    };
+
+    const handleDeleteRole = async (role: Role) => {
+        if (!serverRecord) return;
+
+        const confirmed = await confirm({
+            title: "Delete Role",
+            description: `Are you sure you want to delete the role "${role.name}"? This action cannot be undone and will remove this role from all users who have it.`,
+            confirmText: "Delete Role",
+            cancelText: "Cancel",
+            variant: "destructive",
+        });
+
+        if (!confirmed) return;
+
+        try {
+            await deleteServerRole(
+                serverRecord.server_url,
+                serverRecord.user_id,
+                role.id,
+            );
+
+            // Optimistically update local roles state
+            setRoles((prev) => prev.filter((r) => r.id !== role.id));
+
+            toast.success("Role deleted successfully");
+            clearServerStatusCache();
+        } catch (error) {
+            console.error("Failed to delete role:", error);
+            toast.error("Failed to delete role");
+            // Only refresh on error to sync with server
+            refreshServerData();
+        }
     };
 
     if (loading || contextLoading) {
@@ -221,39 +658,57 @@ export default function ServerEditPage() {
             />
 
             <div className="flex-1 overflow-auto">
-                <div className="container mx-auto max-w-6xl p-6">
-                    <div className="mb-2">
-                        <div>
-                            <h1 className="flex items-center gap-2 text-3xl font-bold">
-                                <Settings className="h-8 w-8" />
-                                Server Settings
-                            </h1>
-                            <p className="text-muted-foreground">
-                                Manage your server&apos;s configuration, roles,
-                                and members
-                            </p>
-                        </div>
+                <div className="container mx-auto max-w-4xl p-6">
+                    <div className="mb-6">
+                        <h1 className="flex items-center gap-2 text-3xl font-bold">
+                            <Settings className="h-8 w-8" />
+                            Server Settings
+                        </h1>
+                        <p className="text-muted-foreground">
+                            Manage your server configuration and settings
+                        </p>
                     </div>
 
-                    <Tabs defaultValue="general" className="space-y-2">
-                        <TabsList className="grid w-full grid-cols-5">
-                            <TabsTrigger value="general">General</TabsTrigger>
-                            <TabsTrigger value="roles">Roles</TabsTrigger>
-                            <TabsTrigger value="members">Members</TabsTrigger>
-                            <TabsTrigger value="invites">Invites</TabsTrigger>
-                            <TabsTrigger value="security">Security</TabsTrigger>
-                        </TabsList>
+                    <Tabs defaultValue="general" className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <TabsList className="grid w-fit grid-cols-3">
+                                <TabsTrigger value="general">
+                                    General
+                                </TabsTrigger>
+                                <TabsTrigger value="roles">Roles</TabsTrigger>
+                                <TabsTrigger
+                                    value="invites"
+                                    onClick={() => {
+                                        if (invites.length === 0) {
+                                            loadInvites();
+                                        }
+                                    }}
+                                >
+                                    Invites
+                                </TabsTrigger>
+                            </TabsList>
+
+                            <Button
+                                onClick={saveServerConfig}
+                                disabled={saving}
+                                className="flex items-center gap-2"
+                            >
+                                <Save className="h-4 w-4" />
+                                {saving ? "Saving..." : "Save Changes"}
+                            </Button>
+                        </div>
 
                         <TabsContent value="general">
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Server Information</CardTitle>
+                                    <CardTitle>Server Configuration</CardTitle>
                                     <CardDescription>
                                         Configure your server&apos;s basic
                                         information and settings
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-6">
+                                    {/* Server Icon */}
                                     <div className="flex items-center space-x-4">
                                         <div className="relative">
                                             <Avatar className="h-20 w-20">
@@ -291,6 +746,7 @@ export default function ServerEditPage() {
                                         </div>
                                     </div>
 
+                                    {/* Server Name and Max Users */}
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <Label htmlFor="name">
@@ -305,6 +761,7 @@ export default function ServerEditPage() {
                                                         name: e.target.value,
                                                     })
                                                 }
+                                                placeholder="Enter server name"
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -314,6 +771,7 @@ export default function ServerEditPage() {
                                             <Input
                                                 id="max-users"
                                                 type="number"
+                                                min="1"
                                                 value={formData.max_users || ""}
                                                 onChange={(e) =>
                                                     setFormData({
@@ -323,10 +781,12 @@ export default function ServerEditPage() {
                                                         ),
                                                     })
                                                 }
+                                                placeholder="Maximum number of users"
                                             />
                                         </div>
                                     </div>
 
+                                    {/* Description */}
                                     <div className="space-y-2">
                                         <Label htmlFor="description">
                                             Description
@@ -340,11 +800,64 @@ export default function ServerEditPage() {
                                                     description: e.target.value,
                                                 })
                                             }
+                                            placeholder="Describe your server"
                                             rows={3}
                                         />
                                     </div>
 
-                                    <div className="flex items-center justify-between">
+                                    {/* File Settings */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="max-file-size">
+                                                Max File Size (MB)
+                                            </Label>
+                                            <Input
+                                                id="max-file-size"
+                                                type="number"
+                                                min="1"
+                                                value={
+                                                    formData.max_file_size || ""
+                                                }
+                                                onChange={(e) =>
+                                                    setFormData({
+                                                        ...formData,
+                                                        max_file_size: parseInt(
+                                                            e.target.value,
+                                                        ),
+                                                    })
+                                                }
+                                                placeholder="Maximum file size"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="max-attachments">
+                                                Max Attachments per Message
+                                            </Label>
+                                            <Input
+                                                id="max-attachments"
+                                                type="number"
+                                                min="1"
+                                                max="100"
+                                                value={
+                                                    formData.max_attachments ||
+                                                    ""
+                                                }
+                                                onChange={(e) =>
+                                                    setFormData({
+                                                        ...formData,
+                                                        max_attachments:
+                                                            parseInt(
+                                                                e.target.value,
+                                                            ),
+                                                    })
+                                                }
+                                                placeholder="Maximum attachments"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Allow Invites Toggle */}
+                                    <div className="flex items-center justify-between rounded-lg border p-4">
                                         <div>
                                             <Label htmlFor="allow-invite">
                                                 Allow Invites
@@ -373,49 +886,213 @@ export default function ServerEditPage() {
 
                         <TabsContent value="roles">
                             <div className="space-y-6">
+                                {/* Create New Role */}
                                 <Card>
                                     <CardHeader>
-                                        <CardTitle>Create New Role</CardTitle>
-                                        <CardDescription>
-                                            Add a new role to your server
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="flex gap-4">
-                                            <Input
-                                                placeholder="Role name"
-                                                value={newRole.name}
-                                                onChange={(e) =>
-                                                    setNewRole({
-                                                        ...newRole,
-                                                        name: e.target.value,
-                                                    })
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <CardTitle>
+                                                    Create New Role
+                                                </CardTitle>
+                                                <CardDescription>
+                                                    Add a new role to your
+                                                    server with custom
+                                                    permissions
+                                                </CardDescription>
+                                            </div>
+                                            <Button
+                                                onClick={handleCreateRole}
+                                                disabled={
+                                                    creatingRole ||
+                                                    !newRole.name.trim()
                                                 }
-                                                className="h-10 w-full"
-                                            />
-                                            <ColorPicker
-                                                value={newRole.color}
-                                                onChange={(color) =>
-                                                    setNewRole({
-                                                        ...newRole,
-                                                        color: color,
-                                                    })
-                                                }
-                                                className="h-10 w-12"
-                                            />
-                                            <Button onClick={createRole}>
-                                                <Plus className="mr-2 h-4 w-4" />
-                                                Create
+                                                className="flex items-center gap-2"
+                                            >
+                                                <Plus className="h-4 w-4" />
+                                                {creatingRole
+                                                    ? "Creating..."
+                                                    : "Create Role"}
                                             </Button>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="new-role-name">
+                                                    Role Name
+                                                </Label>
+                                                <Input
+                                                    id="new-role-name"
+                                                    placeholder="Enter role name"
+                                                    value={newRole.name}
+                                                    onChange={(e) =>
+                                                        setNewRole((prev) => ({
+                                                            ...prev,
+                                                            name: e.target
+                                                                .value,
+                                                        }))
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="new-role-rank">
+                                                    Rank
+                                                </Label>
+                                                <Input
+                                                    id="new-role-rank"
+                                                    type="number"
+                                                    min="1"
+                                                    value={newRole.rank}
+                                                    onChange={(e) =>
+                                                        setNewRole((prev) => ({
+                                                            ...prev,
+                                                            rank:
+                                                                parseInt(
+                                                                    e.target
+                                                                        .value,
+                                                                ) || 100,
+                                                        }))
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Role Color</Label>
+                                                <ColorPicker
+                                                    value={newRole.color}
+                                                    onChange={(color) =>
+                                                        setNewRole((prev) => ({
+                                                            ...prev,
+                                                            color: color,
+                                                        }))
+                                                    }
+                                                    className="h-10 w-full"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Permission presets and permissions for new role */}
+                                        <div className="space-y-4">
+                                            <div className="space-y-2">
+                                                <Label>
+                                                    Permission Presets
+                                                </Label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {Object.entries(
+                                                        PERMISSION_PRESETS,
+                                                    ).map(([key, preset]) => {
+                                                        const isActive =
+                                                            getActivePreset(
+                                                                newRole.permissions,
+                                                            ) === key;
+                                                        return (
+                                                            <Button
+                                                                key={key}
+                                                                variant={
+                                                                    "outline"
+                                                                }
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    applyPermissionPreset(
+                                                                        key as keyof typeof PERMISSION_PRESETS,
+                                                                        true,
+                                                                    )
+                                                                }
+                                                                className={`${
+                                                                    isActive
+                                                                        ? "bg-primary text-primary-foreground hover:text-primary-foreground hover:bg-primary/80"
+                                                                        : ""
+                                                                }`}
+                                                                type="button"
+                                                            >
+                                                                {preset.name}
+                                                            </Button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label>Permissions</Label>
+                                                <TooltipProvider>
+                                                    <div className="max-h-64 overflow-y-auto rounded-lg border p-3">
+                                                        {PERMISSION_GROUPS.map(
+                                                            (group) => (
+                                                                <div
+                                                                    key={
+                                                                        group.category
+                                                                    }
+                                                                    className="mb-4 last:mb-0"
+                                                                >
+                                                                    <h4 className="text-muted-foreground mb-2 text-sm font-medium">
+                                                                        {
+                                                                            group.category
+                                                                        }
+                                                                    </h4>
+                                                                    <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-4">
+                                                                        {group.permissions.map(
+                                                                            (
+                                                                                perm,
+                                                                            ) => (
+                                                                                <div
+                                                                                    key={
+                                                                                        perm.value
+                                                                                    }
+                                                                                    className="flex items-center space-x-2"
+                                                                                >
+                                                                                    <Checkbox
+                                                                                        id={`new-${perm.value}`}
+                                                                                        checked={newRole.permissions.includes(
+                                                                                            perm.value,
+                                                                                        )}
+                                                                                        onCheckedChange={() =>
+                                                                                            togglePermission(
+                                                                                                perm.value,
+                                                                                                true,
+                                                                                            )
+                                                                                        }
+                                                                                    />
+                                                                                    <Tooltip>
+                                                                                        <TooltipTrigger
+                                                                                            asChild
+                                                                                        >
+                                                                                            <Label
+                                                                                                htmlFor={`new-${perm.value}`}
+                                                                                                className="cursor-pointer text-sm"
+                                                                                            >
+                                                                                                {
+                                                                                                    perm.label
+                                                                                                }
+                                                                                            </Label>
+                                                                                        </TooltipTrigger>
+                                                                                        <TooltipContent>
+                                                                                            <p>
+                                                                                                {
+                                                                                                    perm.description
+                                                                                                }
+                                                                                            </p>
+                                                                                        </TooltipContent>
+                                                                                    </Tooltip>
+                                                                                </div>
+                                                                            ),
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                </TooltipProvider>
+                                            </div>
                                         </div>
                                     </CardContent>
                                 </Card>
 
+                                {/* Existing Roles */}
                                 <Card>
                                     <CardHeader>
                                         <CardTitle>Server Roles</CardTitle>
                                         <CardDescription>
-                                            Manage roles and their permissions
+                                            Manage existing roles and their
+                                            permissions
                                         </CardDescription>
                                     </CardHeader>
                                     <CardContent>
@@ -423,132 +1100,286 @@ export default function ServerEditPage() {
                                             {roles.map((role) => (
                                                 <div
                                                     key={role.id}
-                                                    className="flex items-center justify-between rounded-lg border p-3"
+                                                    className="rounded-lg border p-4"
                                                 >
-                                                    <div className="flex items-center gap-3">
-                                                        <div
-                                                            className="h-4 w-4 rounded-full"
-                                                            style={{
-                                                                backgroundColor:
-                                                                    role.color,
-                                                            }}
-                                                        />
-                                                        <div>
-                                                            <p className="font-medium">
-                                                                {role.name}
-                                                            </p>
-                                                            <p className="text-muted-foreground text-sm">
-                                                                Rank:{" "}
-                                                                {role.rank} •{" "}
-                                                                {
-                                                                    role
-                                                                        .permissions
-                                                                        .length
-                                                                }{" "}
-                                                                permissions
-                                                            </p>
+                                                    {editingRole === role.id &&
+                                                    editRole ? (
+                                                        // Edit mode
+                                                        <div className="space-y-4">
+                                                            <div className="grid grid-cols-3 gap-4">
+                                                                <div className="space-y-2">
+                                                                    <Label>
+                                                                        Role
+                                                                        Name
+                                                                    </Label>
+                                                                    <Input
+                                                                        value={
+                                                                            editRole.name
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
+                                                                            setEditRole(
+                                                                                (
+                                                                                    prev,
+                                                                                ) =>
+                                                                                    prev
+                                                                                        ? {
+                                                                                              ...prev,
+                                                                                              name: e
+                                                                                                  .target
+                                                                                                  .value,
+                                                                                          }
+                                                                                        : null,
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                    <Label>
+                                                                        Rank
+                                                                    </Label>
+                                                                    <Input
+                                                                        type="number"
+                                                                        min="1"
+                                                                        value={
+                                                                            editRole.rank
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
+                                                                            setEditRole(
+                                                                                (
+                                                                                    prev,
+                                                                                ) =>
+                                                                                    prev
+                                                                                        ? {
+                                                                                              ...prev,
+                                                                                              rank:
+                                                                                                  parseInt(
+                                                                                                      e
+                                                                                                          .target
+                                                                                                          .value,
+                                                                                                  ) ||
+                                                                                                  100,
+                                                                                          }
+                                                                                        : null,
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                    <Label>
+                                                                        Role
+                                                                        Color
+                                                                    </Label>
+                                                                    <ColorPicker
+                                                                        value={
+                                                                            editRole.color
+                                                                        }
+                                                                        onChange={(
+                                                                            color,
+                                                                        ) =>
+                                                                            setEditRole(
+                                                                                (
+                                                                                    prev,
+                                                                                ) =>
+                                                                                    prev
+                                                                                        ? {
+                                                                                              ...prev,
+                                                                                              color: color,
+                                                                                          }
+                                                                                        : null,
+                                                                            )
+                                                                        }
+                                                                        className="h-10 w-full"
+                                                                    />
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="space-y-2">
+                                                                <Label>
+                                                                    Permissions
+                                                                </Label>
+                                                                <div className="max-h-64 overflow-y-auto rounded-lg border p-3">
+                                                                    {PERMISSION_GROUPS.map(
+                                                                        (
+                                                                            group,
+                                                                        ) => (
+                                                                            <div
+                                                                                key={
+                                                                                    group.category
+                                                                                }
+                                                                                className="mb-4 last:mb-0"
+                                                                            >
+                                                                                <h4 className="text-muted-foreground mb-2 text-sm font-medium">
+                                                                                    {
+                                                                                        group.category
+                                                                                    }
+                                                                                </h4>
+                                                                                <div className="grid grid-cols-2 gap-2">
+                                                                                    {group.permissions.map(
+                                                                                        (
+                                                                                            perm,
+                                                                                        ) => (
+                                                                                            <div
+                                                                                                key={
+                                                                                                    perm.value
+                                                                                                }
+                                                                                                className="flex items-center space-x-2"
+                                                                                            >
+                                                                                                <Checkbox
+                                                                                                    id={`edit-${role.id}-${perm.value}`}
+                                                                                                    checked={editRole.permissions.includes(
+                                                                                                        perm.value,
+                                                                                                    )}
+                                                                                                    onCheckedChange={() =>
+                                                                                                        togglePermission(
+                                                                                                            perm.value,
+                                                                                                            false,
+                                                                                                        )
+                                                                                                    }
+                                                                                                />
+                                                                                                <Tooltip>
+                                                                                                    <TooltipTrigger
+                                                                                                        asChild
+                                                                                                    >
+                                                                                                        <Label
+                                                                                                            htmlFor={`edit-${role.id}-${perm.value}`}
+                                                                                                            className="cursor-pointer text-sm"
+                                                                                                        >
+                                                                                                            {
+                                                                                                                perm.label
+                                                                                                            }
+                                                                                                        </Label>
+                                                                                                    </TooltipTrigger>
+                                                                                                    <TooltipContent>
+                                                                                                        <p>
+                                                                                                            {
+                                                                                                                perm.description
+                                                                                                            }
+                                                                                                        </p>
+                                                                                                    </TooltipContent>
+                                                                                                </Tooltip>
+                                                                                            </div>
+                                                                                        ),
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        ),
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex justify-end gap-2">
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={
+                                                                        handleCancelEdit
+                                                                    }
+                                                                >
+                                                                    <X className="mr-1 h-4 w-4" />
+                                                                    Cancel
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={
+                                                                        handleSaveRole
+                                                                    }
+                                                                >
+                                                                    <Check className="mr-1 h-4 w-4" />
+                                                                    Save
+                                                                </Button>
+                                                            </div>
                                                         </div>
-                                                        {role.id ===
-                                                            "admin" && (
-                                                            <Crown className="h-4 w-4 text-yellow-500" />
-                                                        )}
-                                                    </div>
-                                                    <Badge
-                                                        variant={
-                                                            role.assignable
-                                                                ? "default"
-                                                                : "secondary"
-                                                        }
-                                                    >
-                                                        {role.assignable
-                                                            ? "Assignable"
-                                                            : "System"}
-                                                    </Badge>
+                                                    ) : (
+                                                        // Display mode
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-3">
+                                                                <div
+                                                                    className="h-4 w-4 rounded-full"
+                                                                    style={{
+                                                                        backgroundColor:
+                                                                            role.color,
+                                                                    }}
+                                                                />
+                                                                <div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <p className="font-medium">
+                                                                            {
+                                                                                role.name
+                                                                            }
+                                                                        </p>
+                                                                        {role.id ===
+                                                                            "owner" && (
+                                                                            <Crown className="h-4 w-4 text-yellow-500" />
+                                                                        )}
+                                                                    </div>
+                                                                    <p className="text-muted-foreground text-sm">
+                                                                        Rank:{" "}
+                                                                        {
+                                                                            role.rank
+                                                                        }{" "}
+                                                                        •{" "}
+                                                                        {
+                                                                            role
+                                                                                .permissions
+                                                                                .length
+                                                                        }{" "}
+                                                                        permissions
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {!role.assignable && (
+                                                                    <Badge
+                                                                        variant={
+                                                                            "secondary"
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            "System"
+                                                                        }
+                                                                    </Badge>
+                                                                )}
+                                                                {role.assignable && (
+                                                                    <>
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() =>
+                                                                                handleEditRole(
+                                                                                    role,
+                                                                                )
+                                                                            }
+                                                                            className="h-8 w-8 p-0"
+                                                                        >
+                                                                            <Edit2 className="h-4 w-4" />
+                                                                        </Button>
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() =>
+                                                                                handleDeleteRole(
+                                                                                    role,
+                                                                                )
+                                                                            }
+                                                                            className="hover:bg-destructive hover:text-destructive-foreground h-8 w-8 p-0"
+                                                                        >
+                                                                            <Trash2 className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
                                     </CardContent>
                                 </Card>
                             </div>
-                        </TabsContent>
-
-                        <TabsContent value="members">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Server Members</CardTitle>
-                                    <CardDescription>
-                                        Manage member roles and permissions
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-4">
-                                        {users.map((user) => (
-                                            <div
-                                                key={user.id}
-                                                className="flex items-center justify-between rounded-lg border p-4"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="relative">
-                                                        <Avatar>
-                                                            <AvatarFallback>
-                                                                {user.username
-                                                                    .substring(
-                                                                        0,
-                                                                        2,
-                                                                    )
-                                                                    .toUpperCase()}
-                                                            </AvatarFallback>
-                                                        </Avatar>
-                                                        {user.is_online && (
-                                                            <div className="border-background absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 bg-green-500" />
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-medium">
-                                                            {user.nickname ||
-                                                                user.username}
-                                                        </p>
-                                                        <p className="text-muted-foreground text-sm">
-                                                            @{user.username}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    {user.roles.map((role) => (
-                                                        <Badge
-                                                            key={role.id}
-                                                            variant="outline"
-                                                            className="gap-1"
-                                                            style={{
-                                                                borderColor:
-                                                                    role.color,
-                                                                color: role.color,
-                                                            }}
-                                                        >
-                                                            {role.name}
-                                                            {role.assignable && (
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    className="hover:bg-destructive hover:text-destructive-foreground h-4 w-4 p-0"
-                                                                    onClick={() =>
-                                                                        handleRemoveRole(
-                                                                            user.id,
-                                                                            role.id,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <X className="h-3 w-3" />
-                                                                </Button>
-                                                            )}
-                                                        </Badge>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
                         </TabsContent>
 
                         <TabsContent value="invites">
@@ -562,49 +1393,65 @@ export default function ServerEditPage() {
                                         </CardDescription>
                                     </CardHeader>
                                     <CardContent>
-                                        <div className="flex gap-4">
-                                            <div className="space-y-2">
-                                                <Label>
+                                        <div className="flex items-end gap-4">
+                                            <div className="flex-1 space-y-2">
+                                                <Label htmlFor="expires-in">
                                                     Expires in (hours)
                                                 </Label>
                                                 <Input
+                                                    id="expires-in"
                                                     type="number"
+                                                    min="1"
                                                     value={newInvite.expires_in}
                                                     onChange={(e) =>
-                                                        setNewInvite({
-                                                            ...newInvite,
-                                                            expires_in:
-                                                                parseInt(
-                                                                    e.target
-                                                                        .value,
-                                                                ),
-                                                        })
+                                                        setNewInvite(
+                                                            (prev) => ({
+                                                                ...prev,
+                                                                expires_in:
+                                                                    parseInt(
+                                                                        e.target
+                                                                            .value,
+                                                                    ) || 24,
+                                                            }),
+                                                        )
                                                     }
+                                                    placeholder="24"
                                                 />
                                             </div>
-                                            <div className="space-y-2">
-                                                <Label>
+                                            <div className="flex-1 space-y-2">
+                                                <Label htmlFor="max-uses">
                                                     Max uses (0 = unlimited)
                                                 </Label>
                                                 <Input
+                                                    id="max-uses"
                                                     type="number"
+                                                    min="0"
                                                     value={newInvite.max_uses}
                                                     onChange={(e) =>
-                                                        setNewInvite({
-                                                            ...newInvite,
-                                                            max_uses: parseInt(
-                                                                e.target.value,
-                                                            ),
-                                                        })
+                                                        setNewInvite(
+                                                            (prev) => ({
+                                                                ...prev,
+                                                                max_uses:
+                                                                    parseInt(
+                                                                        e.target
+                                                                            .value,
+                                                                    ) || 0,
+                                                            }),
+                                                        )
                                                     }
+                                                    placeholder="0"
                                                 />
                                             </div>
-                                            <div className="flex items-end">
-                                                <Button onClick={createInvite}>
-                                                    <UserPlus className="mr-2 h-4 w-4" />
-                                                    Create Invite
-                                                </Button>
-                                            </div>
+                                            <Button
+                                                onClick={handleCreateInvite}
+                                                disabled={creatingInvite}
+                                                className="flex items-center gap-2"
+                                            >
+                                                <UserPlus className="h-4 w-4" />
+                                                {creatingInvite
+                                                    ? "Creating..."
+                                                    : "Create Invite"}
+                                            </Button>
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -617,117 +1464,96 @@ export default function ServerEditPage() {
                                         </CardDescription>
                                     </CardHeader>
                                     <CardContent>
-                                        <div className="space-y-3">
-                                            {invites.map((invite) => (
-                                                <div
-                                                    key={invite.code}
-                                                    className="flex items-center justify-between rounded-lg border p-3"
-                                                >
-                                                    <div>
-                                                        <p className="font-mono text-sm">
-                                                            {invite.code}
-                                                        </p>
-                                                        <p className="text-muted-foreground text-xs">
-                                                            Uses: {invite.uses}/
-                                                            {invite.max_uses ||
-                                                                "∞"}{" "}
-                                                            •
-                                                            {invite.expires_at
-                                                                ? ` Expires: ${new Date(
-                                                                      invite.expires_at,
-                                                                  ).toLocaleDateString()}`
-                                                                : " Never expires"}
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex gap-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                copyInviteCode(
-                                                                    invite.code,
-                                                                )
-                                                            }
+                                        {loadingInvites ? (
+                                            <div className="space-y-3">
+                                                {Array.from({ length: 3 }).map(
+                                                    (_, i) => (
+                                                        <div
+                                                            key={i}
+                                                            className="flex items-center justify-between rounded-lg border p-3"
                                                         >
-                                                            <Copy className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                deleteInvite(
-                                                                    invite.code,
-                                                                )
-                                                            }
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
+                                                            <div className="space-y-1">
+                                                                <Skeleton className="h-4 w-24" />
+                                                                <Skeleton className="h-3 w-48" />
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <Skeleton className="h-8 w-8" />
+                                                                <Skeleton className="h-8 w-8" />
+                                                            </div>
+                                                        </div>
+                                                    ),
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {invites.map((invite) => (
+                                                    <div
+                                                        key={invite.code}
+                                                        className="flex items-center justify-between rounded-lg border p-3"
+                                                    >
+                                                        <div>
+                                                            <p className="font-mono text-sm font-medium">
+                                                                {invite.code}
+                                                            </p>
+                                                            <p className="text-muted-foreground text-xs">
+                                                                Uses:{" "}
+                                                                {invite.uses}/
+                                                                {invite.max_uses ||
+                                                                    "∞"}{" "}
+                                                                •
+                                                                {invite.expires_at
+                                                                    ? ` Expires: ${new Date(invite.expires_at).toLocaleDateString()}`
+                                                                    : " Never expires"}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    copyInviteCode(
+                                                                        invite.code,
+                                                                    )
+                                                                }
+                                                                className="h-8 w-8 p-0"
+                                                            >
+                                                                <Copy className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    handleDeleteInvite(
+                                                                        invite.code,
+                                                                    )
+                                                                }
+                                                                className="hover:bg-destructive hover:text-destructive-foreground h-8 w-8 p-0"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
-                                            {invites.length === 0 && (
-                                                <p className="text-muted-foreground py-8 text-center">
-                                                    No active invites
-                                                </p>
-                                            )}
-                                        </div>
+                                                ))}
+                                                {invites.length === 0 &&
+                                                    !loadingInvites && (
+                                                        <div className="text-muted-foreground py-12 text-center">
+                                                            <UserPlus className="mx-auto mb-3 h-12 w-12 opacity-50" />
+                                                            <p className="mb-1 text-lg font-medium">
+                                                                No active
+                                                                invites
+                                                            </p>
+                                                            <p className="text-sm">
+                                                                Create your
+                                                                first invite to
+                                                                get started
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                            </div>
+                                        )}
                                     </CardContent>
                                 </Card>
                             </div>
-                        </TabsContent>
-
-                        <TabsContent value="security">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Security Settings</CardTitle>
-                                    <CardDescription>
-                                        Configure security and moderation
-                                        settings
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-6">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Max File Size (MB)</Label>
-                                            <Input
-                                                type="number"
-                                                value={
-                                                    formData.max_file_size || ""
-                                                }
-                                                onChange={(e) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        max_file_size: parseInt(
-                                                            e.target.value,
-                                                        ),
-                                                    })
-                                                }
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>
-                                                Max Attachments per Message
-                                            </Label>
-                                            <Input
-                                                type="number"
-                                                value={
-                                                    formData.max_attachments ||
-                                                    ""
-                                                }
-                                                onChange={(e) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        max_attachments:
-                                                            parseInt(
-                                                                e.target.value,
-                                                            ),
-                                                    })
-                                                }
-                                            />
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
                         </TabsContent>
                     </Tabs>
                 </div>
@@ -749,12 +1575,12 @@ function ServerEditSkeleton() {
             </div>
 
             <div className="flex-1 overflow-auto">
-                <div className="container mx-auto max-w-6xl p-6">
-                    <div className="mb-2">
+                <div className="container mx-auto max-w-4xl p-6">
+                    <div className="mb-6">
                         <Skeleton className="mb-2 h-10 w-64" />
                         <Skeleton className="h-4 w-96" />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-6">
                         <Skeleton className="h-12 w-full" />
                         <Card>
                             <CardHeader>

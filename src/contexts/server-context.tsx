@@ -6,6 +6,7 @@ import {
     ServerInfo,
     getChannels,
     getUsers,
+    getRoles,
     Channel,
 } from "@/api/server";
 import { getServerById, ServerRecord } from "@/storage/server-store";
@@ -174,13 +175,9 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
             const usersResponse = await getUsers(record.server_url, userId);
             setUsers(usersResponse.users);
 
-            // Extract roles from users
-            const allRoles = usersResponse.users.flatMap((user) => user.roles);
-            const uniqueRoles = allRoles.filter(
-                (role, index, array) =>
-                    array.findIndex((r) => r.id === role.id) === index,
-            );
-            setRoles(uniqueRoles);
+            // Fetch roles
+            const rolesResponse = await getRoles(record.server_url, userId);
+            setRoles(rolesResponse.roles);
         } catch (err) {
             setError(
                 err instanceof Error ? err : new Error("Failed to load server"),
