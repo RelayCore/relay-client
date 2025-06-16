@@ -8,6 +8,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { Search, Smile, Loader2 } from "lucide-react";
+import { assetSrc } from "@/utils/assets";
 
 interface EmojiData {
     emoji: string;
@@ -136,7 +137,7 @@ function parseEmojiTestFile(content: string): EmojiCategories {
 // Load emoji data from public folder
 async function loadEmojiData(): Promise<EmojiCategories> {
     try {
-        const response = await fetch("/emoji-test.txt");
+        const response = await fetch(assetSrc("/emoji-test.txt"));
         if (!response.ok) {
             throw new Error("Failed to load emoji data");
         }
