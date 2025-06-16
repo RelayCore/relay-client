@@ -123,6 +123,17 @@ export class WebSocketConnection {
                     this.reconnectDelay = 1000;
                     this.startPingMonitoring();
                     this.onConnectionChange?.(true);
+
+                    // Emit connection change event
+                    window.dispatchEvent(
+                        new CustomEvent("websocket-connection-changed", {
+                            detail: {
+                                userId: this.server.user_id,
+                                connected: true,
+                            },
+                        }),
+                    );
+
                     resolve();
                 };
 
@@ -159,6 +170,16 @@ export class WebSocketConnection {
                     this.connectionState = "disconnected";
                     this.stopPingMonitoring();
                     this.onConnectionChange?.(false);
+
+                    // Emit connection change event
+                    window.dispatchEvent(
+                        new CustomEvent("websocket-connection-changed", {
+                            detail: {
+                                userId: this.server.user_id,
+                                connected: false,
+                            },
+                        }),
+                    );
 
                     if (
                         !this.isIntentionallyClosed &&
@@ -356,6 +377,13 @@ export class WebSocketConnection {
             this.ws.close();
             this.ws = null;
         }
+
+        // Emit connection change event
+        window.dispatchEvent(
+            new CustomEvent("websocket-connection-changed", {
+                detail: { userId: this.server.user_id, connected: false },
+            }),
+        );
     }
 
     get isConnected(): boolean {
@@ -486,6 +514,10 @@ export class WebSocketManager {
         this.connections.forEach((connection) => connection.disconnect());
         this.connections.clear();
         console.log(`[WebSocketManager] Disconnected all connections`);
+    }
+
+    get allConnections() {
+        return Array.from(this.connections.values());
     }
 }
 

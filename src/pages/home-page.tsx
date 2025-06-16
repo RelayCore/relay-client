@@ -12,6 +12,7 @@ import { ServerIcon, Plus, Users } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { loadServers, ServerRecord } from "@/storage/server-store";
 import { JoinServerDialog } from "@/components/server/join-server-dialog";
+import { webSocketManager } from "@/websocket/websocket-manager";
 
 interface ServerMetadata {
     name: string;
@@ -40,6 +41,9 @@ export default function HomePage() {
         Map<string, ServerStatus>
     >(new Map());
     const [isLoading, setIsLoading] = useState(true);
+    const [connectionStates, setConnectionStates] = useState<
+        Map<string, boolean>
+    >(new Map());
     const navigate = useNavigate();
 
     // Load cached server statuses
@@ -169,6 +173,16 @@ export default function HomePage() {
 
                 // Then verify servers
                 await verifyServers(serverData);
+
+                // Initialize connection states
+                const initialConnectionStates = new Map<string, boolean>();
+                serverData.forEach((server) => {
+                    initialConnectionStates.set(
+                        server.user_id,
+                        webSocketManager.isConnected(server.user_id),
+                    );
+                });
+                setConnectionStates(initialConnectionStates);
             } catch (error) {
                 console.error("Failed to load servers:", error);
             } finally {
@@ -183,9 +197,24 @@ export default function HomePage() {
             loadServerData();
         };
 
+        // Listen for connection changes
+        const handleConnectionChange = (event: CustomEvent) => {
+            const { userId, connected } = event.detail;
+            setConnectionStates((prev) => new Map(prev).set(userId, connected));
+        };
+
         window.addEventListener("servers-updated", handleServersUpdated);
+        window.addEventListener(
+            "websocket-connection-changed",
+            handleConnectionChange as EventListener,
+        );
+
         return () => {
             window.removeEventListener("servers-updated", handleServersUpdated);
+            window.removeEventListener(
+                "websocket-connection-changed",
+                handleConnectionChange as EventListener,
+            );
         };
     }, [loadCachedStatuses, verifyServers]);
 
@@ -220,6 +249,18 @@ export default function HomePage() {
             return status?.online ?? true; // Default to true if unknown
         },
         [serverStatuses],
+    );
+
+    // Helper function to check if server is accessible (online AND WebSocket connected)
+    const isServerAccessible = useCallback(
+        (server: ServerRecord) => {
+            const status = serverStatuses.get(server.user_id);
+            const isOnline = status?.online ?? true;
+            const isWebSocketConnected =
+                connectionStates.get(server.user_id) ?? false;
+            return isOnline && isWebSocketConnected;
+        },
+        [serverStatuses, connectionStates],
     );
 
     if (isLoading) {
@@ -285,15 +326,20 @@ export default function HomePage() {
                         return (
                             <Card
                                 key={server.user_id}
-                                className={`hover:bg-muted ease-snappy cursor-pointer gap-0 transition-all ${
-                                    !online ? "opacity-60" : ""
+                                className={`hover:bg-muted ease-snappy transition-all ${
+                                    !isServerAccessible(server)
+                                        ? "cursor-not-allowed opacity-60"
+                                        : "cursor-pointer"
                                 }`}
-                                onClick={() =>
-                                    online &&
-                                    navigate({
-                                        to: `/servers/${server.user_id}`,
-                                    })
-                                }
+                                onClick={() => {
+                                    const accessible =
+                                        isServerAccessible(server);
+                                    if (accessible) {
+                                        navigate({
+                                            to: `/servers/${server.user_id}`,
+                                        });
+                                    }
+                                }}
                             >
                                 <CardHeader>
                                     <div className="flex items-center gap-3">
@@ -321,7 +367,7 @@ export default function HomePage() {
                                             />
                                             <div
                                                 className={`border-background absolute -right-1 -bottom-1 h-3 w-3 rounded-full border-2 ${
-                                                    online
+                                                    isServerAccessible(server)
                                                         ? "bg-green-500"
                                                         : "bg-red-500"
                                                 }`}
@@ -334,14 +380,18 @@ export default function HomePage() {
                                             <div className="mt-1 flex items-center gap-2">
                                                 <Badge
                                                     variant={
-                                                        online
+                                                        isServerAccessible(
+                                                            server,
+                                                        )
                                                             ? "default"
                                                             : "secondary"
                                                     }
                                                 >
-                                                    {online
-                                                        ? "Online"
-                                                        : "Offline"}
+                                                    {isServerAccessible(server)
+                                                        ? "Connected"
+                                                        : online
+                                                          ? "Connecting..."
+                                                          : "Offline"}
                                                 </Badge>
                                                 {status?.metadata && (
                                                     <Badge

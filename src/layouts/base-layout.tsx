@@ -88,6 +88,9 @@ function BaseLayoutContent({
     const [serverStatuses, setServerStatuses] = React.useState<
         Map<string, ServerStatus>
     >(new Map());
+    const [connectionStates, setConnectionStates] = React.useState<
+        Map<string, boolean>
+    >(new Map());
 
     // Load cached server statuses
     const loadCachedStatuses = React.useCallback(() => {
@@ -249,6 +252,16 @@ function BaseLayoutContent({
 
                 // Verify servers and connect to WebSockets
                 verifyServers(serverData);
+
+                // Initialize connection states
+                const initialConnectionStates = new Map<string, boolean>();
+                serverData.forEach((server) => {
+                    initialConnectionStates.set(
+                        server.user_id,
+                        webSocketManager.isConnected(server.user_id),
+                    );
+                });
+                setConnectionStates(initialConnectionStates);
             } catch (error) {
                 console.error("Failed to load servers:", error);
             }
@@ -261,10 +274,24 @@ function BaseLayoutContent({
             loadServerData();
         };
 
+        // Listen for connection changes
+        const handleConnectionChange = (event: CustomEvent) => {
+            const { userId, connected } = event.detail;
+            setConnectionStates((prev) => new Map(prev).set(userId, connected));
+        };
+
         window.addEventListener("servers-updated", handleServersUpdated);
+        window.addEventListener(
+            "websocket-connection-changed",
+            handleConnectionChange as EventListener,
+        );
 
         return () => {
             window.removeEventListener("servers-updated", handleServersUpdated);
+            window.removeEventListener(
+                "websocket-connection-changed",
+                handleConnectionChange as EventListener,
+            );
 
             // Cleanup all WebSocket connections
             servers.forEach((server) => {
@@ -364,13 +391,16 @@ function BaseLayoutContent({
         [serverStatuses],
     );
 
-    // Helper function to check if server is online
-    const isServerOnline = React.useCallback(
+    // Helper function to check if server is accessible (online AND WebSocket connected)
+    const isServerAccessible = React.useCallback(
         (server: ServerRecord) => {
             const status = serverStatuses.get(server.user_id);
-            return status?.online ?? true; // Default to true if unknown
+            const isOnline = status?.online ?? true;
+            const isWebSocketConnected =
+                connectionStates.get(server.user_id) ?? false;
+            return isOnline && isWebSocketConnected;
         },
-        [serverStatuses],
+        [serverStatuses, connectionStates],
     );
 
     return (
@@ -419,33 +449,42 @@ function BaseLayoutContent({
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                             {servers.map((server) => {
-                                const online = isServerOnline(server);
+                                const accessible = isServerAccessible(server);
                                 const displayName =
                                     getServerDisplayName(server);
                                 const status = serverStatuses.get(
                                     server.user_id,
                                 );
                                 const serverIcon = status?.metadata?.icon;
-                                console.log(status, serverIcon);
 
                                 return (
                                     <SidebarMenuItem key={server.user_id}>
                                         <SidebarMenuButton
-                                            tooltip={`${displayName}${online ? "" : " (Offline)"}`}
-                                            onClick={() =>
-                                                navigate({
-                                                    to: `/servers/${server.user_id}`,
-                                                })
-                                            }
+                                            tooltip={`${displayName}${
+                                                accessible
+                                                    ? ""
+                                                    : status?.online
+                                                      ? " (Connecting...)"
+                                                      : " (Offline)"
+                                            }`}
+                                            onClick={() => {
+                                                if (accessible) {
+                                                    navigate({
+                                                        to: `/servers/${server.user_id}`,
+                                                    });
+                                                }
+                                            }}
                                             isActive={
                                                 router.state.location
                                                     .pathname ===
                                                 `/servers/${server.user_id}`
                                             }
                                             className={
-                                                !online ? "opacity-50" : ""
+                                                !accessible
+                                                    ? "cursor-not-allowed opacity-50"
+                                                    : ""
                                             }
-                                            disabled={!online}
+                                            disabled={!accessible}
                                         >
                                             <div className="relative">
                                                 {serverIcon ? (
@@ -454,7 +493,6 @@ function BaseLayoutContent({
                                                         alt={`${displayName} icon`}
                                                         className="h-6 w-6 min-w-6 rounded object-cover"
                                                         onError={(e) => {
-                                                            // Fallback to ServerIcon if image fails to load
                                                             const target =
                                                                 e.target as HTMLImageElement;
                                                             target.style.display =
@@ -468,7 +506,7 @@ function BaseLayoutContent({
                                                 <ServerIcon
                                                     className={`min-w-6 ${serverIcon ? "hidden" : ""}`}
                                                 />
-                                                {!online && (
+                                                {!accessible && (
                                                     <div className="bg-destructive absolute -right-1 -bottom-1 h-2 w-2 rounded-full" />
                                                 )}
                                             </div>
