@@ -10,6 +10,11 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+    Tooltip,
+    TooltipTrigger,
+    TooltipContent,
+} from "@/components/ui/tooltip";
+import {
     useServerInfo,
     useMembers,
     useChannels,
@@ -118,14 +123,21 @@ export default function ServerHeader({
         >
             <div className="flex items-center gap-3">
                 {showBackButton && (
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onBackClick}
-                        className="text-muted-foreground hover:text-foreground"
-                    >
-                        <ArrowLeft size={20} />
-                    </Button>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={onBackClick}
+                                className="text-muted-foreground hover:text-foreground"
+                            >
+                                <ArrowLeft size={20} />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Go back</p>
+                        </TooltipContent>
+                    </Tooltip>
                 )}
                 <h1 className="font-medium">{serverInfo.name}</h1>
                 {channelName && (
@@ -142,19 +154,26 @@ export default function ServerHeader({
                 className={`flex items-center gap-1 ${customNavigation ? "pr-35" : ""}`}
             >
                 <Popover open={isSearchOpen} onOpenChange={setIsSearchOpen}>
-                    <PopoverTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className={cn(
-                                "text-muted-foreground hover:text-foreground",
-                                isSearchOpen &&
-                                    "bg-accent/50 text-accent-foreground",
-                            )}
-                        >
-                            <Search size={20} />
-                        </Button>
-                    </PopoverTrigger>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className={cn(
+                                        "text-muted-foreground hover:text-foreground",
+                                        isSearchOpen &&
+                                            "bg-accent/50 text-accent-foreground",
+                                    )}
+                                >
+                                    <Search size={20} />
+                                </Button>
+                            </PopoverTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Search messages</p>
+                        </TooltipContent>
+                    </Tooltip>
                     <PopoverContent
                         side="bottom"
                         align="end"
@@ -170,19 +189,26 @@ export default function ServerHeader({
                 </Popover>
 
                 <Popover open={isPinnedOpen} onOpenChange={setIsPinnedOpen}>
-                    <PopoverTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className={cn(
-                                "text-muted-foreground hover:text-foreground",
-                                isPinnedOpen &&
-                                    "bg-accent/50 text-accent-foreground",
-                            )}
-                        >
-                            <Pin size={20} />
-                        </Button>
-                    </PopoverTrigger>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className={cn(
+                                        "text-muted-foreground hover:text-foreground",
+                                        isPinnedOpen &&
+                                            "bg-accent/50 text-accent-foreground",
+                                    )}
+                                >
+                                    <Pin size={20} />
+                                </Button>
+                            </PopoverTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Pinned messages</p>
+                        </TooltipContent>
+                    </Tooltip>
                     <PopoverContent
                         side="bottom"
                         align="end"
@@ -198,33 +224,48 @@ export default function ServerHeader({
                     </PopoverContent>
                 </Popover>
 
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn(
-                        "text-muted-foreground hover:text-foreground",
-                        showMembers && "bg-accent/50 text-accent-foreground",
-                    )}
-                    onClick={toggleMemberList}
-                >
-                    <Users size={20} />
-                </Button>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className={cn(
+                                "text-muted-foreground hover:text-foreground",
+                                showMembers &&
+                                    "bg-accent/50 text-accent-foreground",
+                            )}
+                            onClick={toggleMemberList}
+                        >
+                            <Users size={20} />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>{showMembers ? "Hide" : "Show"} member list</p>
+                    </TooltipContent>
+                </Tooltip>
 
                 {canEditServer && (
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className={cn(
-                            "text-muted-foreground hover:text-foreground",
-                            isOnSettingsPage &&
-                                "bg-accent/50 text-accent-foreground",
-                        )}
-                        onClick={() =>
-                            navigate({ to: `/servers/${userId}/edit` })
-                        }
-                    >
-                        <Settings size={20} />
-                    </Button>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn(
+                                    "text-muted-foreground hover:text-foreground",
+                                    isOnSettingsPage &&
+                                        "bg-accent/50 text-accent-foreground",
+                                )}
+                                onClick={() =>
+                                    navigate({ to: `/servers/${userId}/edit` })
+                                }
+                            >
+                                <Settings size={20} />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Server settings</p>
+                        </TooltipContent>
+                    </Tooltip>
                 )}
             </div>
         </header>
