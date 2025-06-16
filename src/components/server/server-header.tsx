@@ -17,9 +17,14 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { PinnedPopup } from "./pinned-popup";
 import { useSetting } from "@/utils/settings";
-import { searchMessages, MessageSearchResponse } from "@/api/server";
+import {
+    searchMessages,
+    MessageSearchResponse,
+    hasPermission,
+} from "@/api/server";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 export interface ServerHeaderProps {
     userId: string | undefined;
@@ -43,6 +48,7 @@ export default function ServerHeader({
     const { serverInfo, loading } = useServerInfo();
     const { showMembers, toggleMemberList } = useMembers();
     const { selectedChannelId } = useChannels();
+    const { currentUser } = useCurrentUser();
     const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     const [isPinnedOpen, setIsPinnedOpen] = React.useState(false);
     const [searchQuery, setSearchQuery] = React.useState("");
@@ -54,6 +60,10 @@ export default function ServerHeader({
         React.useState<NodeJS.Timeout | null>(null);
     const customNavigation = useSetting("windowIconsStyle") === "custom";
     const navigate = useNavigate();
+
+    const canEditServer = React.useMemo(() => {
+        return hasPermission(currentUser, "manage_server");
+    }, [currentUser]);
 
     // Debounced search function
     const performSearch = React.useCallback(
@@ -200,18 +210,22 @@ export default function ServerHeader({
                     <Users size={20} />
                 </Button>
 
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn(
-                        "text-muted-foreground hover:text-foreground",
-                        isOnSettingsPage &&
-                            "bg-accent/50 text-accent-foreground",
-                    )}
-                    onClick={() => navigate({ to: `/servers/${userId}/edit` })}
-                >
-                    <Settings size={20} />
-                </Button>
+                {canEditServer && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                            "text-muted-foreground hover:text-foreground",
+                            isOnSettingsPage &&
+                                "bg-accent/50 text-accent-foreground",
+                        )}
+                        onClick={() =>
+                            navigate({ to: `/servers/${userId}/edit` })
+                        }
+                    >
+                        <Settings size={20} />
+                    </Button>
+                )}
             </div>
         </header>
     );
