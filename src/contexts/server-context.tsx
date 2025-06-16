@@ -21,6 +21,7 @@ import {
     UserStatusData,
     webSocketManager,
     WebSocketMessage,
+    ChannelUpdateBroadcast,
 } from "@/websocket/websocket-manager";
 import { toast } from "sonner";
 
@@ -44,6 +45,7 @@ interface ServerContextState {
     // Actions
     setSelectedChannelId: (channelId: number | null) => void;
     setSelectedVoiceChannelId: (channelId: number | null) => void;
+    setChannelGroups: (groups: ChannelGroup[]) => void;
     toggleMemberList: () => void;
     refreshServerData: () => Promise<void>;
     clearServerStatusCache: () => void;
@@ -237,7 +239,7 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         [users],
     );
 
-    // Add WebSocket message handler for user status updates
+    // Add WebSocket message handler for user status updates and channel updates
     React.useEffect(() => {
         if (!userId) return;
 
@@ -269,6 +271,68 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                             ),
                         })),
                     );
+                    break;
+                }
+                case MESSAGE_TYPES.CHANNEL_UPDATE: {
+                    const updates = (message.data as ChannelUpdateBroadcast)
+                        .channels;
+                    console.log(
+                        "Processing channel updates in context:",
+                        updates,
+                    );
+
+                    setChannelGroups((prevGroups) => {
+                        // Create a map of updates for quick lookup
+                        const updateMap = new Map(
+                            updates.map((update) => [update.id, update]),
+                        );
+
+                        // Update all channels with their new properties
+                        const updatedGroups = prevGroups.map((group) => ({
+                            ...group,
+                            channels: group.channels.map((channel) => {
+                                const update = updateMap.get(channel.id);
+                                if (update) {
+                                    return {
+                                        ...channel,
+                                        group_id: update.group_id,
+                                        position: update.position,
+                                        name: update.name || channel.name,
+                                        description:
+                                            update.description ||
+                                            channel.description,
+                                    };
+                                }
+                                return channel;
+                            }),
+                        }));
+
+                        // Redistribute channels based on their group_id
+                        const finalGroups = updatedGroups.map((group) => {
+                            // Collect all channels that should belong to this group
+                            const channelsForGroup: Channel[] = [];
+
+                            updatedGroups.forEach((sourceGroup) => {
+                                sourceGroup.channels.forEach((channel) => {
+                                    if (channel.group_id === group.id) {
+                                        channelsForGroup.push(channel);
+                                    }
+                                });
+                            });
+
+                            // Sort channels by position
+                            channelsForGroup.sort(
+                                (a, b) => a.position - b.position,
+                            );
+
+                            return {
+                                ...group,
+                                channels: channelsForGroup,
+                            };
+                        });
+
+                        return finalGroups;
+                    });
                     break;
                 }
             }
@@ -326,6 +390,7 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         error,
         setSelectedChannelId,
         setSelectedVoiceChannelId,
+        setChannelGroups,
         toggleMemberList,
         refreshServerData,
         clearServerStatusCache,
@@ -362,6 +427,7 @@ export function useChannels() {
         selectedVoiceChannelId,
         setSelectedChannelId,
         setSelectedVoiceChannelId,
+        setChannelGroups,
         refreshServerData,
         getSelectedChannel,
         getSelectedVoiceChannel,
@@ -372,6 +438,7 @@ export function useChannels() {
         selectedVoiceChannelId,
         setSelectedChannelId,
         setSelectedVoiceChannelId,
+        setChannelGroups,
         refreshServerData,
         getSelectedChannel,
         getSelectedVoiceChannel,

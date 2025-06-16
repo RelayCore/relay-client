@@ -140,6 +140,7 @@ export interface CreateChannelRequest {
 
 export interface UpdateChannelRequest {
     channel_id: number;
+    group_id?: number;
     name?: string;
     description?: string;
     position?: number;

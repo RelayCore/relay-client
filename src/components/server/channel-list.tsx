@@ -20,7 +20,13 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Channel, ChannelGroup, User, VoiceParticipant } from "@/api/server";
+import {
+    Channel,
+    ChannelGroup,
+    User,
+    VoiceParticipant,
+    updateChannel,
+} from "@/api/server";
 import { VoiceEventData } from "@/api/voice";
 import {
     webSocketManager,
@@ -36,6 +42,10 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import EditChannelDialog from "./edit-channel-dialog";
 import { UserAvatar } from "./user-avatar";
 import { VoiceUserContextMenu } from "./voice-user-context-menu";
+// @ts-expect-error - react-dnd CommonJS/ESM compatibility issue
+import { DndProvider, useDrag, useDrop } from "react-dnd";
+// @ts-expect-error - react-dnd-html5-backend compatibility issue
+import { HTML5Backend } from "react-dnd-html5-backend";
 
 interface ExpandedGroup extends ChannelGroup {
     expanded: boolean;
@@ -50,6 +60,17 @@ interface VoiceChannelState {
     participantCount: number;
     participants: VoiceParticipant[];
 }
+
+interface DragItem {
+    type: string;
+    id: number;
+    groupId: number;
+    position: number;
+}
+
+const ItemTypes = {
+    CHANNEL: "channel",
+};
 
 export default function ChannelList({
     onSelectChannel,
@@ -333,92 +354,124 @@ export default function ChannelList({
         setEditChannelOpen(true);
     };
 
+    const moveChannel = async (
+        draggedChannel: Channel,
+        targetGroupId: number,
+        newPosition: number,
+    ) => {
+        if (!serverRecord?.server_url || !userId) return;
+
+        try {
+            await updateChannel(serverRecord.server_url, userId, {
+                channel_id: draggedChannel.id,
+                group_id: targetGroupId,
+                position: newPosition,
+            });
+        } catch (error) {
+            console.error("Failed to update channel position:", error);
+        }
+    };
+
     return (
-        <div className={cn("flex h-full w-full flex-col", className)}>
-            <ScrollArea className="flex-1 pr-1">
-                {expandedGroups.map((group) => (
-                    <div key={group.id} className="mb-4">
-                        <GroupHeader
-                            group={group}
-                            onToggle={() => toggleGroup(group.id)}
-                            onCreateChannel={() => setCreateChannelOpen(true)}
-                        />
+        <DndProvider backend={HTML5Backend}>
+            <div className={cn("flex h-full w-full flex-col", className)}>
+                <ScrollArea className="flex-1 pr-1">
+                    {expandedGroups.map((group) => (
+                        <div key={group.id} className="mb-4">
+                            <GroupHeader
+                                group={group}
+                                onToggle={() => toggleGroup(group.id)}
+                                onCreateChannel={() =>
+                                    setCreateChannelOpen(true)
+                                }
+                            />
 
-                        {group.expanded && (
-                            <div className="ml-1">
-                                {group.channels
-                                    .sort((a, b) => a.position - b.position)
-                                    .map((channel) => (
-                                        <ChannelContextMenu
-                                            key={channel.id}
-                                            channel={channel}
-                                            serverUrl={
-                                                serverRecord?.server_url || ""
-                                            }
-                                            currentUser={currentUser}
-                                            onChannelDeleted={refreshServerData}
-                                            onChannelEdit={(channel) =>
-                                                handleEditChannel(channel)
-                                            }
-                                        >
-                                            <ChannelItem
-                                                channel={channel}
-                                                isSelected={
-                                                    channel.is_voice
-                                                        ? false
-                                                        : channel.id ===
-                                                          selectedChannelId
-                                                }
-                                                onlineUsers={onlineUsers}
-                                                voiceState={voiceChannelStates.get(
-                                                    channel.id,
-                                                )}
-                                                onClick={() =>
-                                                    handleChannelClick(channel)
-                                                }
-                                            />
-                                        </ChannelContextMenu>
-                                    ))}
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </ScrollArea>
+                            {group.expanded && (
+                                <ChannelDropZone
+                                    group={group}
+                                    onMoveChannel={moveChannel}
+                                >
+                                    <div className="ml-1">
+                                        {group.channels
+                                            .sort(
+                                                (a, b) =>
+                                                    a.position - b.position,
+                                            )
+                                            .map((channel) => (
+                                                <DraggableChannel
+                                                    key={channel.id}
+                                                    channel={channel}
+                                                    isSelected={
+                                                        channel.is_voice
+                                                            ? false
+                                                            : channel.id ===
+                                                              selectedChannelId
+                                                    }
+                                                    onlineUsers={onlineUsers}
+                                                    voiceState={voiceChannelStates.get(
+                                                        channel.id,
+                                                    )}
+                                                    onClick={() =>
+                                                        handleChannelClick(
+                                                            channel,
+                                                        )
+                                                    }
+                                                    onEditChannel={
+                                                        handleEditChannel
+                                                    }
+                                                    serverUrl={
+                                                        serverRecord?.server_url ||
+                                                        ""
+                                                    }
+                                                    currentUser={
+                                                        currentUser ?? null
+                                                    }
+                                                    onChannelDeleted={
+                                                        refreshServerData
+                                                    }
+                                                    onMoveChannel={moveChannel}
+                                                />
+                                            ))}
+                                    </div>
+                                </ChannelDropZone>
+                            )}
+                        </div>
+                    ))}
+                </ScrollArea>
 
-            {currentUser && (
-                <UserPanel
-                    currentUser={currentUser}
-                    connectedVoiceChannel={connectedVoiceChannel}
-                    onDisconnect={handleDisconnectFromVoice}
+                {currentUser && (
+                    <UserPanel
+                        currentUser={currentUser}
+                        connectedVoiceChannel={connectedVoiceChannel}
+                        onDisconnect={handleDisconnectFromVoice}
+                    />
+                )}
+
+                <CreateChannelDialog
+                    open={createChannelOpen}
+                    onOpenChange={setCreateChannelOpen}
+                    channelGroups={channelGroups}
+                    onChannelCreated={handleChannelCreated}
                 />
-            )}
 
-            <CreateChannelDialog
-                open={createChannelOpen}
-                onOpenChange={setCreateChannelOpen}
-                channelGroups={channelGroups}
-                onChannelCreated={handleChannelCreated}
-            />
-
-            <EditChannelDialog
-                open={editChannelOpen}
-                onOpenChange={setEditChannelOpen}
-                channel={editChannel}
-                onChannelUpdated={refreshServerData}
-            />
-        </div>
+                <EditChannelDialog
+                    open={editChannelOpen}
+                    onOpenChange={setEditChannelOpen}
+                    channel={editChannel}
+                    onChannelUpdated={refreshServerData}
+                />
+            </div>
+        </DndProvider>
     );
 }
 
-function GroupHeader({
-    group,
-    onToggle,
-    onCreateChannel,
-}: {
+interface GroupHeaderProps {
     group: ExpandedGroup;
     onToggle: () => void;
     onCreateChannel: () => void;
-}) {
+}
+
+function GroupHeader({ group, onToggle, onCreateChannel }: GroupHeaderProps) {
     return (
         <div className="text-muted-foreground hover:text-foreground group flex w-full items-center justify-between px-1 py-1 text-xs font-semibold transition-colors">
             <button
@@ -463,56 +516,215 @@ function GroupHeader({
     );
 }
 
-function ChannelItem({
-    channel,
-    isSelected,
-    onlineUsers = [],
-    voiceState,
-    onClick,
-}: {
+interface ChannelDropZoneProps {
+    group: ChannelGroup;
+    children: React.ReactNode;
+    onMoveChannel: (
+        channel: Channel,
+        groupId: number,
+        position: number,
+    ) => void;
+}
+
+function ChannelDropZone({
+    group,
+    children,
+    onMoveChannel,
+}: ChannelDropZoneProps) {
+    const [{ isOver }, drop] = useDrop(
+        () => ({
+            accept: ItemTypes.CHANNEL,
+            drop: (item: DragItem, monitor) => {
+                if (!monitor.didDrop()) {
+                    // Calculate new position based on existing channels in target group
+                    const maxPosition =
+                        group.channels.length > 0
+                            ? Math.max(
+                                  ...group.channels.map((ch) => ch.position),
+                              )
+                            : 0;
+                    const newPosition = maxPosition + 1;
+
+                    // Create a channel object with the dragged item's data
+                    const draggedChannel: Channel = {
+                        id: item.id,
+                        name: "", // These will be filled by the server
+                        description: "",
+                        position: item.position,
+                        group_id: item.groupId,
+                        group_name: "",
+                        is_voice: false,
+                        participants: null,
+                    };
+
+                    onMoveChannel(draggedChannel, group.id, newPosition);
+                }
+            },
+            collect: (monitor) => ({
+                isOver: monitor.isOver({ shallow: true }),
+            }),
+        }),
+        [group, onMoveChannel],
+    );
+
+    return (
+        <div
+            ref={(node) => {
+                if (node) drop(node);
+            }}
+            className={cn(
+                "transition-colors",
+                isOver && "bg-accent/20 rounded-md",
+            )}
+        >
+            {children}
+        </div>
+    );
+}
+
+interface DraggableChannelProps {
     channel: Channel;
     isSelected: boolean;
     onlineUsers?: string[];
     voiceState?: VoiceChannelState;
     onClick: () => void;
-}) {
+    onEditChannel: (channel: Channel) => void;
+    serverUrl: string;
+    currentUser: User | null;
+    onChannelDeleted: () => void;
+    onMoveChannel: (
+        channel: Channel,
+        groupId: number,
+        position: number,
+    ) => void;
+}
+
+function DraggableChannel({
+    channel,
+    isSelected,
+    onlineUsers = [],
+    voiceState,
+    onClick,
+    onEditChannel,
+    serverUrl,
+    currentUser,
+    onChannelDeleted,
+    onMoveChannel,
+}: DraggableChannelProps) {
+    const [{ isDragging }, drag, preview] = useDrag(
+        () => ({
+            type: ItemTypes.CHANNEL,
+            item: {
+                type: ItemTypes.CHANNEL,
+                id: channel.id,
+                groupId: channel.group_id,
+                position: channel.position,
+            },
+            collect: (monitor) => ({
+                isDragging: monitor.isDragging(),
+            }),
+        }),
+        [channel],
+    );
+
+    const [{ isOver, canDrop }, drop] = useDrop(
+        () => ({
+            accept: ItemTypes.CHANNEL,
+            drop: (item: DragItem) => {
+                if (item.id !== channel.id) {
+                    // Calculate position relative to the drop target
+                    // Insert before the target channel
+                    const newPosition = channel.position;
+
+                    const draggedChannel: Channel = {
+                        id: item.id,
+                        name: "",
+                        description: "",
+                        position: item.position,
+                        group_id: item.groupId,
+                        group_name: "",
+                        is_voice: false,
+                        participants: null,
+                    };
+
+                    onMoveChannel(
+                        draggedChannel,
+                        channel.group_id,
+                        newPosition,
+                    );
+                }
+            },
+            collect: (monitor) => ({
+                isOver: monitor.isOver(),
+                canDrop: monitor.canDrop(),
+            }),
+        }),
+        [channel, onMoveChannel],
+    );
+
     const isVoiceChannel = channel.is_voice;
     const hasVoiceActivity = voiceState && voiceState.participantCount > 0;
 
     return (
-        <div>
-            <button
-                className={cn(
-                    "group relative mb-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1 text-sm",
-                    isSelected
-                        ? "bg-accent text-accent-foreground"
-                        : "text-muted-foreground hover:bg-accent/30 hover:text-foreground",
-                )}
-                onClick={onClick}
+        <div
+            ref={(node) => {
+                drag(node);
+                drop(node);
+                preview(node);
+            }}
+            className={cn(
+                "relative",
+                isDragging && "opacity-50",
+                isOver && canDrop && "border-primary border-t-2",
+            )}
+        >
+            <ChannelContextMenu
+                channel={channel}
+                serverUrl={serverUrl}
+                currentUser={currentUser ?? undefined}
+                onChannelDeleted={onChannelDeleted}
+                onChannelEdit={onEditChannel}
             >
-                {isVoiceChannel ? (
-                    <Volume2
-                        size={18}
-                        className={cn(hasVoiceActivity ? "text-green-500" : "")}
-                    />
-                ) : (
-                    <Hash size={18} />
-                )}
+                <button
+                    className={cn(
+                        "group relative mb-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1 text-sm",
+                        isSelected
+                            ? "bg-accent text-accent-foreground"
+                            : "text-muted-foreground hover:bg-accent/30 hover:text-foreground",
+                    )}
+                    onClick={onClick}
+                >
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                        {isVoiceChannel ? (
+                            <Volume2
+                                size={18}
+                                className={cn(
+                                    hasVoiceActivity ? "text-green-500" : "",
+                                )}
+                            />
+                        ) : (
+                            <Hash size={18} />
+                        )}
 
-                <span className="truncate">{channel.name}</span>
-
-                {isVoiceChannel && hasVoiceActivity && (
-                    <div className="ml-auto flex items-center gap-1 text-xs">
-                        <Users size={12} />
-                        <span className="text-xs">
-                            {voiceState.participantCount}
-                        </span>
+                        <span className="truncate">{channel.name}</span>
                     </div>
-                )}
-                {!isVoiceChannel && onlineUsers.length > 0 && !isSelected && (
-                    <div className="ml-auto h-1.5 w-1.5 rounded-full bg-blue-500" />
-                )}
-            </button>
+
+                    {isVoiceChannel && hasVoiceActivity && (
+                        <div className="ml-auto flex items-center gap-1 text-xs">
+                            <Users size={12} />
+                            <span className="text-xs">
+                                {voiceState.participantCount}
+                            </span>
+                        </div>
+                    )}
+                    {!isVoiceChannel &&
+                        onlineUsers.length > 0 &&
+                        !isSelected && (
+                            <div className="ml-auto h-1.5 w-1.5 rounded-full bg-blue-500" />
+                        )}
+                </button>
+            </ChannelContextMenu>
+
             {isVoiceChannel &&
                 voiceState &&
                 voiceState.participants.length > 0 && (
@@ -522,7 +734,6 @@ function ChannelItem({
                                 key={participant.user_id}
                                 participant={participant}
                                 openProfile={() => {
-                                    // Handle opening user profile
                                     console.log(
                                         "Open profile for:",
                                         participant.username,

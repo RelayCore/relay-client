@@ -2,7 +2,7 @@ import { ServerRecord } from "@/storage/server-store";
 import { VoiceClient, VoiceEventData } from "@/api/voice";
 import { toast } from "sonner";
 import { inDevelopment } from "@/config";
-import { Attachment, ChannelPermission } from "@/api/server";
+import { Attachment } from "@/api/server";
 
 export interface WebSocketMessage {
     type: string;
@@ -48,16 +48,17 @@ export interface MessageEditedBroadcast {
     pinned: boolean;
 }
 
-export interface ChannelUpdateBroadcast {
+export interface ChannelUpdateBroadcastItem {
     id: number;
-    name: string;
-    description: string;
-    position: number;
     group_id: number;
-    group_name: string;
-    is_voice: boolean;
-    permissions: ChannelPermission[];
+    position: number;
+    name?: string;
+    description?: string;
 }
+
+export type ChannelUpdateBroadcast = {
+    channels: ChannelUpdateBroadcastItem[];
+};
 
 export const MESSAGE_TYPES = {
     ONLINE_USERS: "online_users",
