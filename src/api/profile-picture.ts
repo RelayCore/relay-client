@@ -41,7 +41,7 @@ function saveFailedUploads(failed: FailedUpload[]): void {
 /**
  * Converts file path to File object using Electron file system APIs
  */
-async function filePathToFile(filePath: string): Promise<File> {
+export async function filePathToFile(filePath: string): Promise<File> {
     try {
         // Check if file exists
         const existsResult = await window.fileSystem.fileExists(filePath);

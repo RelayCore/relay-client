@@ -18,6 +18,7 @@ import { Loader2 } from "lucide-react";
 import { getSetting } from "@/utils/settings";
 import { addServer } from "@/storage/server-store";
 import { useNavigate } from "@tanstack/react-router";
+import { filePathToFile } from "@/api/profile-picture";
 
 interface JoinServerDialogProps {
     children?: React.ReactNode;
@@ -117,16 +118,7 @@ export function JoinServerDialog({
                 const profilePicturePath = getSetting("userAvatar") as string;
                 if (profilePicturePath && profilePicturePath.trim()) {
                     try {
-                        // Convert file path to File object
-                        const response = await fetch(
-                            `file://${profilePicturePath}`,
-                        );
-                        const blob = await response.blob();
-                        const fileName =
-                            profilePicturePath.split(/[\\/]/).pop() || "avatar";
-                        const file = new File([blob], fileName, {
-                            type: blob.type,
-                        });
+                        const file = await filePathToFile(profilePicturePath);
 
                         await uploadProfilePicture(
                             serverUrl.trim(),
