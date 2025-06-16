@@ -33,17 +33,18 @@ export default function MemberList({
         if (members.length) {
             const newGroups: MemberGroup[] = [];
 
-            // If we have roles, group members by role
             if (roles.length) {
                 // Sort roles by rank (higher rank first)
                 const sortedRoles = [...roles].sort((a, b) => b.rank - a.rank);
 
-                // Create a group for users with each role
+                // Only online members for role groups
                 sortedRoles.forEach((role) => {
-                    const roleMembers = members.filter((member) =>
-                        member.roles.some(
-                            (memberRole) => memberRole.id === role.id,
-                        ),
+                    const roleMembers = members.filter(
+                        (member) =>
+                            member.is_online &&
+                            member.roles.some(
+                                (memberRole) => memberRole.id === role.id,
+                            ),
                     );
 
                     if (roleMembers.length > 0) {
@@ -57,11 +58,10 @@ export default function MemberList({
                     }
                 });
 
-                // Create a group for online members without special roles
-                const onlineMembersWithoutRoles = members.filter((m) => {
-                    const hasRole = m.roles.length > 0;
-                    return !hasRole && m.is_online;
-                });
+                // Online members without any roles
+                const onlineMembersWithoutRoles = members.filter(
+                    (m) => m.is_online && m.roles.length === 0,
+                );
 
                 if (onlineMembersWithoutRoles.length > 0) {
                     newGroups.push({
@@ -71,24 +71,31 @@ export default function MemberList({
                     });
                 }
 
-                // Add offline members without roles
-                const offlineMembersWithoutRoles = members.filter((m) => {
-                    const hasRole = m.roles.length > 0;
-                    return !hasRole && !m.is_online;
-                });
+                // All offline members (regardless of role), sorted alphabetically
+                const offlineMembers = members
+                    .filter((m) => !m.is_online)
+                    .sort((a, b) => {
+                        const nameA = (a.nickname || a.username).toLowerCase();
+                        const nameB = (b.nickname || b.username).toLowerCase();
+                        return nameA.localeCompare(nameB);
+                    });
 
-                if (offlineMembersWithoutRoles.length > 0) {
+                if (offlineMembers.length > 0) {
                     newGroups.push({
                         id: "offline",
-                        name: `Offline — ${offlineMembersWithoutRoles.length}`,
-                        members: offlineMembersWithoutRoles,
+                        name: `Offline — ${offlineMembers.length}`,
+                        members: offlineMembers,
                     });
                 }
-            }
-            // If we don't have roles, group by online status
-            else {
+            } else {
                 const online = members.filter((m) => m.is_online);
-                const offline = members.filter((m) => !m.is_online);
+                const offline = members
+                    .filter((m) => !m.is_online)
+                    .sort((a, b) => {
+                        const nameA = (a.nickname || a.username).toLowerCase();
+                        const nameB = (b.nickname || b.username).toLowerCase();
+                        return nameA.localeCompare(nameB);
+                    });
 
                 if (online.length) {
                     newGroups.push({
