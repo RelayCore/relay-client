@@ -2,7 +2,7 @@ import { ServerRecord } from "@/storage/server-store";
 import { VoiceClient, VoiceEventData } from "@/api/voice";
 import { toast } from "sonner";
 import { inDevelopment } from "@/config";
-import { Attachment } from "@/api/server";
+import { Attachment, ChannelPermission } from "@/api/server";
 
 export interface WebSocketMessage {
     type: string;
@@ -48,6 +48,17 @@ export interface MessageEditedBroadcast {
     pinned: boolean;
 }
 
+export interface ChannelUpdateBroadcast {
+    id: number;
+    name: string;
+    description: string;
+    position: number;
+    group_id: number;
+    group_name: string;
+    is_voice: boolean;
+    permissions: ChannelPermission[];
+}
+
 export const MESSAGE_TYPES = {
     ONLINE_USERS: "online_users",
     USER_STATUS: "user_status",
@@ -58,6 +69,7 @@ export const MESSAGE_TYPES = {
     USER_LEFT_VOICE: "user_left_voice",
     VOICE_STATE_UPDATE: "voice_state_update",
     SPEAKING_UPDATE: "speaking_update",
+    CHANNEL_UPDATE: "channel_update",
     WEBRTC_CONFIG: "webrtc_config",
     CREATE_WEBRTC_OFFER: "create_webrtc_offer",
     WEBRTC_ANSWER: "webrtc_answer",
