@@ -153,7 +153,7 @@ function PinnedMessageItem({
     message: Message;
     currentUserId: string;
 }) {
-    const { users } = useMembers();
+    const { getUserById } = useMembers();
     const formattedDate = formatMessageDate(message.created_at);
     const hasAttachments =
         message.attachments &&
@@ -162,8 +162,8 @@ function PinnedMessageItem({
 
     const userId = message.author_id || "";
 
-    // Find the real user from the members list
-    const user = users.find((user) => user.id === userId) || {
+    // Use getUserById to get user information
+    const user = getUserById(userId) || {
         id: userId,
         username: message.username || "Unknown",
         nickname: "",
@@ -188,18 +188,28 @@ function PinnedMessageItem({
                 <div className="mb-2 flex items-center space-x-2">
                     <UserPopover user={user} currentUserId={currentUserId}>
                         <Avatar className="h-6 w-6 cursor-pointer">
-                            <AvatarFallback
-                                className="text-xs"
-                                style={{
-                                    backgroundColor: highestColoredRole?.color
-                                        ? `${highestColoredRole.color}20`
-                                        : undefined,
-                                    color:
-                                        highestColoredRole?.color || undefined,
-                                }}
-                            >
-                                {avatarText}
-                            </AvatarFallback>
+                            {user.profile_picture_url ? (
+                                <img
+                                    src={user.profile_picture_url}
+                                    alt={displayName}
+                                    className="h-full w-full rounded-full object-cover"
+                                />
+                            ) : (
+                                <AvatarFallback
+                                    className="text-xs"
+                                    style={{
+                                        backgroundColor:
+                                            highestColoredRole?.color
+                                                ? `${highestColoredRole.color}20`
+                                                : undefined,
+                                        color:
+                                            highestColoredRole?.color ||
+                                            undefined,
+                                    }}
+                                >
+                                    {avatarText}
+                                </AvatarFallback>
+                            )}
                         </Avatar>
                     </UserPopover>
                     <UserPopover user={user} currentUserId={currentUserId}>

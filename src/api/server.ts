@@ -54,6 +54,28 @@ export interface Message {
     pinned: boolean;
 }
 
+export interface MessageSearchResponse {
+    id: number;
+    channel_id: number;
+    channel_name: string;
+    author_id: string;
+    content: string;
+    created_at: string;
+    updated_at: string;
+    username: string;
+    nickname: string;
+    attachments: Attachment[];
+    pinned: boolean;
+}
+
+export interface SearchMessagesRequest {
+    query: string;
+    channel_id?: number;
+    author_id?: string;
+    limit?: number;
+    offset?: number;
+}
+
 // Response interface for deleteMessage
 export interface DeleteMessageResponse {
     message: string;
@@ -838,4 +860,40 @@ export async function uploadProfilePicture(
             body: formData,
         },
     );
+}
+
+export async function searchMessages(
+    serverUrl: string,
+    userId: string,
+    request: SearchMessagesRequest,
+): Promise<{
+    messages: MessageSearchResponse[];
+    count: number;
+    query: string;
+}> {
+    const params = new URLSearchParams();
+    params.append("q", request.query);
+
+    if (request.channel_id !== undefined) {
+        params.append("channel_id", request.channel_id.toString());
+    }
+
+    if (request.author_id) {
+        params.append("author_id", request.author_id);
+    }
+
+    if (request.limit !== undefined) {
+        params.append("limit", request.limit.toString());
+    }
+
+    if (request.offset !== undefined) {
+        params.append("offset", request.offset.toString());
+    }
+
+    const endpoint = `/messages/search?${params.toString()}`;
+    return apiRequest<{
+        messages: MessageSearchResponse[];
+        count: number;
+        query: string;
+    }>(serverUrl, endpoint, userId);
 }

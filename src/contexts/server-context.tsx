@@ -42,6 +42,7 @@ interface ServerContextState {
     clearServerStatusCache: () => void;
     getSelectedChannel: () => Channel | null;
     getSelectedVoiceChannel: () => Channel | null;
+    getUserById: (userId: string) => User | null;
 }
 
 const ServerContext = React.createContext<ServerContextState | null>(null);
@@ -224,6 +225,14 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         return null;
     }, [selectedVoiceChannelId, channelGroups]);
 
+    // Helper function to get user by ID
+    const getUserById = React.useCallback(
+        (userId: string) => {
+            return users.find((user) => user.id === userId) || null;
+        },
+        [users],
+    );
+
     // Add WebSocket message handler for user status updates
     React.useEffect(() => {
         if (!userId) return;
@@ -286,6 +295,7 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         clearServerStatusCache,
         getSelectedChannel,
         getSelectedVoiceChannel,
+        getUserById,
     };
 
     return (
@@ -332,8 +342,9 @@ export function useChannels() {
 }
 
 export function useMembers() {
-    const { users, roles, showMembers, toggleMemberList } = useServer();
-    return { users, roles, showMembers, toggleMemberList };
+    const { users, roles, showMembers, toggleMemberList, getUserById } =
+        useServer();
+    return { users, roles, showMembers, toggleMemberList, getUserById };
 }
 
 export function useServerRecord() {
