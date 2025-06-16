@@ -905,16 +905,18 @@ function UserPanel({
             <div className="flex items-center justify-between">
                 <div className="flex min-w-0 flex-1 items-center gap-2">
                     <UserAvatar
-                        displayName={currentUser.nickname}
+                        displayName={
+                            currentUser.nickname ?? currentUser.username
+                        }
                         profilePictureUrl={currentUser.profile_picture_url}
                         className="h-8 w-8"
                     />
                     <div className="min-w-0 flex-1">
                         <span
                             className="block truncate text-sm font-medium"
-                            title={currentUser.nickname}
+                            title={currentUser.nickname ?? currentUser.username}
                         >
-                            {currentUser.nickname}
+                            {currentUser.nickname ?? currentUser.username}
                         </span>
                         <span className="text-muted-foreground text-xs">
                             {connectedVoiceChannel ? "In voice" : "Online"}
