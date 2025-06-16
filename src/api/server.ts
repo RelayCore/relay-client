@@ -954,6 +954,16 @@ export async function searchMessages(
     }>(serverUrl, endpoint, userId);
 }
 
+// Leave server
+export async function leaveServer(
+    serverUrl: string,
+    userId: string,
+): Promise<{ message: string }> {
+    return apiRequest<{ message: string }>(serverUrl, "/user/leave", userId, {
+        method: "POST",
+    });
+}
+
 // Update server configuration
 export async function updateServerConfig(
     serverUrl: string,

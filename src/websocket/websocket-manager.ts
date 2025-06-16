@@ -531,6 +531,19 @@ export class WebSocketManager {
         console.log(`[WebSocketManager] Disconnected all connections`);
     }
 
+    disconnect(userId: string) {
+        const connection = this.connections.get(userId);
+        if (connection) {
+            connection.disconnect();
+            this.connections.delete(userId);
+            console.log(`[WebSocketManager] Disconnected ${userId}`);
+        } else {
+            console.warn(
+                `[WebSocketManager] No connection found for ${userId}`,
+            );
+        }
+    }
+
     get allConnections() {
         return Array.from(this.connections.values());
     }

@@ -8,11 +8,18 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ServerIcon, Plus, Users } from "lucide-react";
+import { ServerIcon, Plus, Users, LogOut, RefreshCw } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
-import { loadServers, ServerRecord } from "@/storage/server-store";
+import {
+    loadServers,
+    ServerRecord,
+    removeServer,
+} from "@/storage/server-store";
 import { JoinServerDialog } from "@/components/server/join-server-dialog";
 import { webSocketManager } from "@/websocket/websocket-manager";
+import { leaveServer } from "@/api/server";
+import { toast } from "sonner";
+import { useConfirm } from "@/contexts/confirm-context";
 
 interface ServerMetadata {
     name: string;
@@ -35,16 +42,35 @@ interface ServerStatus {
 const SERVER_STATUS_CACHE_KEY = "server-status-cache";
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
+interface ServerRetryInfo {
+    retryCount: number;
+    nextRetry: number;
+    lastAttempt: number;
+}
+
+// Cache key for server retry info
+const SERVER_RETRY_CACHE_KEY = "server-retry-cache";
+const INITIAL_RETRY_DELAY = 30 * 60 * 1000; // 30 minutes
+const MAX_RETRY_DELAY = 24 * 60 * 60 * 1000; // 24 hours
+const MAX_RETRY_COUNT = 10;
+
 export default function HomePage() {
     const [servers, setServers] = useState<ServerRecord[]>([]);
     const [serverStatuses, setServerStatuses] = useState<
         Map<string, ServerStatus>
     >(new Map());
+    const [serverRetries, setServerRetries] = useState<
+        Map<string, ServerRetryInfo>
+    >(new Map());
     const [isLoading, setIsLoading] = useState(true);
     const [connectionStates, setConnectionStates] = useState<
         Map<string, boolean>
     >(new Map());
+    const [leavingServers, setLeavingServers] = useState<Set<string>>(
+        new Set(),
+    );
     const navigate = useNavigate();
+    const { confirm } = useConfirm();
 
     // Load cached server statuses
     const loadCachedStatuses = useCallback(() => {
@@ -93,6 +119,43 @@ export default function HomePage() {
         [],
     );
 
+    // Load cached retry info
+    const loadCachedRetries = useCallback(() => {
+        try {
+            const cached = localStorage.getItem(SERVER_RETRY_CACHE_KEY);
+            if (cached) {
+                const parsedCache = JSON.parse(cached);
+                const retryMap = new Map<string, ServerRetryInfo>();
+
+                Object.entries(parsedCache).forEach(([userId, retryInfo]) => {
+                    retryMap.set(userId, retryInfo as ServerRetryInfo);
+                });
+
+                setServerRetries(retryMap);
+                return retryMap;
+            }
+        } catch (error) {
+            console.error("Failed to load cached retry info:", error);
+        }
+        return new Map<string, ServerRetryInfo>();
+    }, []);
+
+    // Save retry info to cache
+    const saveCachedRetries = useCallback(
+        (retries: Map<string, ServerRetryInfo>) => {
+            try {
+                const cacheObj = Object.fromEntries(retries);
+                localStorage.setItem(
+                    SERVER_RETRY_CACHE_KEY,
+                    JSON.stringify(cacheObj),
+                );
+            } catch (error) {
+                console.error("Failed to save retry info to cache:", error);
+            }
+        },
+        [],
+    );
+
     // Fetch server metadata
     const fetchServerMetadata = useCallback(
         async (server: ServerRecord): Promise<ServerStatus> => {
@@ -128,26 +191,78 @@ export default function HomePage() {
         [],
     );
 
+    // Calculate next retry delay with exponential backoff
+    const calculateRetryDelay = useCallback((retryCount: number) => {
+        const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
+        return Math.min(delay, MAX_RETRY_DELAY);
+    }, []);
+
+    // Update retry info for a server
+    const updateRetryInfo = useCallback(
+        (userId: string, success: boolean) => {
+            setServerRetries((prev) => {
+                const newRetries = new Map(prev);
+                const current = newRetries.get(userId);
+
+                if (success) {
+                    // Remove retry info on success
+                    newRetries.delete(userId);
+                } else {
+                    // Update retry info on failure
+                    const retryCount = (current?.retryCount || 0) + 1;
+                    const now = Date.now();
+                    const delay = calculateRetryDelay(retryCount - 1);
+
+                    if (retryCount <= MAX_RETRY_COUNT) {
+                        newRetries.set(userId, {
+                            retryCount,
+                            nextRetry: now + delay,
+                            lastAttempt: now,
+                        });
+                    }
+                }
+
+                saveCachedRetries(newRetries);
+                return newRetries;
+            });
+        },
+        [calculateRetryDelay, saveCachedRetries],
+    );
+
     // Verify all servers
     const verifyServers = useCallback(
         async (serverList: ServerRecord[]) => {
             const cachedStatuses = loadCachedStatuses();
+            const cachedRetries = loadCachedRetries();
             const newStatuses = new Map(cachedStatuses);
             const promises: Promise<void>[] = [];
+            const now = Date.now();
 
             for (const server of serverList) {
-                // Check if we have valid cached data
                 const cached = cachedStatuses.get(server.user_id);
+                const retryInfo = cachedRetries.get(server.user_id);
+
+                // Check if we should skip this server due to retry logic
+                if (
+                    retryInfo &&
+                    retryInfo.nextRetry > now &&
+                    retryInfo.retryCount <= MAX_RETRY_COUNT
+                ) {
+                    continue;
+                }
+
+                // Check if we have valid cached data
                 if (
                     cached &&
                     Date.now() - cached.lastChecked < CACHE_DURATION
                 ) {
-                    continue; // Skip if cache is still valid
+                    continue;
                 }
 
                 // Fetch fresh data
                 const promise = fetchServerMetadata(server).then((status) => {
                     newStatuses.set(server.user_id, status);
+                    updateRetryInfo(server.user_id, status.online);
                 });
                 promises.push(promise);
             }
@@ -159,7 +274,13 @@ export default function HomePage() {
             setServerStatuses(newStatuses);
             saveCachedStatuses(newStatuses);
         },
-        [loadCachedStatuses, saveCachedStatuses, fetchServerMetadata],
+        [
+            loadCachedStatuses,
+            saveCachedStatuses,
+            fetchServerMetadata,
+            loadCachedRetries,
+            updateRetryInfo,
+        ],
     );
 
     useEffect(() => {
@@ -218,50 +339,203 @@ export default function HomePage() {
         };
     }, [loadCachedStatuses, verifyServers]);
 
-    // Helper function to get server display name
-    const getServerDisplayName = useCallback(
-        (server: ServerRecord) => {
-            const status = serverStatuses.get(server.user_id);
-            if (status?.metadata?.name) {
-                return status.metadata.name;
+    // Helper functions (moved after all useState calls and before other useCallback calls)
+    const getServerDisplayName = (server: ServerRecord) => {
+        const status = serverStatuses.get(server.user_id);
+        if (status?.metadata?.name) {
+            return status.metadata.name;
+        }
+        return server.server_name || server.server_url;
+    };
+
+    const getServerDescription = (server: ServerRecord) => {
+        const status = serverStatuses.get(server.user_id);
+        if (status?.metadata?.description) {
+            return status.metadata.description;
+        }
+        return server.server_description || "No description available";
+    };
+
+    const isServerOnline = (server: ServerRecord) => {
+        const status = serverStatuses.get(server.user_id);
+        return status?.online ?? true; // Default to true if unknown
+    };
+
+    const isServerAccessible = (server: ServerRecord) => {
+        const status = serverStatuses.get(server.user_id);
+        const isOnline = status?.online ?? true;
+        const isWebSocketConnected =
+            connectionStates.get(server.user_id) ?? false;
+        return isOnline && isWebSocketConnected;
+    };
+
+    const getRetryTimeString = (server: ServerRecord) => {
+        const retryInfo = serverRetries.get(server.user_id);
+        if (!retryInfo) return null;
+
+        const timeUntilRetry = retryInfo.nextRetry - Date.now();
+        if (timeUntilRetry <= 0) return "Retrying soon...";
+
+        const hours = Math.floor(timeUntilRetry / (60 * 60 * 1000));
+        const minutes = Math.floor(
+            (timeUntilRetry % (60 * 60 * 1000)) / (60 * 1000),
+        );
+
+        if (hours > 0) {
+            return `Retry in ${hours}h ${minutes}m`;
+        }
+        return `Retry in ${minutes}m`;
+    };
+
+    // Handle leaving a server
+    const handleLeaveServer = useCallback(
+        async (server: ServerRecord) => {
+            const displayName = getServerDisplayName(server);
+            const online = isServerOnline(server);
+
+            const confirmed = await confirm({
+                title: "Leave Server",
+                description: `Are you sure you want to leave "${displayName}"?${
+                    !online
+                        ? "\n\nNote: The server is currently offline. You will be removed locally, but the server won't be notified until it comes back online."
+                        : ""
+                }`,
+                confirmText: "Leave Server",
+                variant: "destructive",
+            });
+
+            if (!confirmed) return;
+
+            setLeavingServers((prev) => new Set(prev).add(server.user_id));
+
+            try {
+                if (online) {
+                    // Try to leave gracefully if server is online
+                    try {
+                        await leaveServer(server.server_url, server.user_id);
+                        toast.success("Successfully left the server");
+                    } catch (error) {
+                        // If leaving fails but server is online, show error but don't remove locally
+                        if (
+                            error instanceof Error &&
+                            error.message.includes(
+                                "Cannot leave server: you are the owner",
+                            )
+                        ) {
+                            toast.error(
+                                "Cannot leave server: you are the owner",
+                            );
+                            return;
+                        }
+                        toast.warning(
+                            "Failed to notify server, but removed locally",
+                        );
+                    }
+                }
+
+                // Disconnect websocket
+                webSocketManager.disconnect(server.user_id);
+
+                // Remove from local storage
+                await removeServer(server.server_url, server.user_id);
+
+                // Clear caches
+                setServerStatuses((prev) => {
+                    const newMap = new Map(prev);
+                    newMap.delete(server.user_id);
+                    return newMap;
+                });
+
+                setServerRetries((prev) => {
+                    const newMap = new Map(prev);
+                    newMap.delete(server.user_id);
+                    saveCachedRetries(newMap);
+                    return newMap;
+                });
+
+                // Clear from localStorage caches
+                try {
+                    const serverCache = localStorage.getItem(
+                        SERVER_STATUS_CACHE_KEY,
+                    );
+                    if (serverCache) {
+                        const parsed = JSON.parse(serverCache);
+                        delete parsed[server.user_id];
+                        localStorage.setItem(
+                            SERVER_STATUS_CACHE_KEY,
+                            JSON.stringify(parsed),
+                        );
+                    }
+                } catch (error) {
+                    console.warn("Failed to clear server cache:", error);
+                }
+
+                if (!online) {
+                    toast.success(
+                        "Server removed locally (server was offline)",
+                    );
+                }
+            } catch (error) {
+                console.error("Failed to leave server:", error);
+                toast.error("Failed to leave server");
+            } finally {
+                setLeavingServers((prev) => {
+                    const newSet = new Set(prev);
+                    newSet.delete(server.user_id);
+                    return newSet;
+                });
             }
-            return server.server_name || server.server_url;
         },
-        [serverStatuses],
+        [confirm, saveCachedRetries],
     );
 
-    // Helper function to get server description
-    const getServerDescription = useCallback(
-        (server: ServerRecord) => {
-            const status = serverStatuses.get(server.user_id);
-            if (status?.metadata?.description) {
-                return status.metadata.description;
+    // Manual retry function
+    const handleRetryServer = useCallback(
+        async (server: ServerRecord) => {
+            const status = await fetchServerMetadata(server);
+            setServerStatuses((prev) =>
+                new Map(prev).set(server.user_id, status),
+            );
+            updateRetryInfo(server.user_id, status.online);
+
+            const displayName =
+                status?.metadata?.name ||
+                server.server_name ||
+                server.server_url;
+            if (status.online) {
+                toast.success(`${displayName} is back online!`);
+            } else {
+                toast.error(`${displayName} is still offline`);
             }
-            return server.server_description || "No description available";
         },
-        [serverStatuses],
+        [fetchServerMetadata, updateRetryInfo],
     );
 
-    // Helper function to check if server is online
-    const isServerOnline = useCallback(
-        (server: ServerRecord) => {
-            const status = serverStatuses.get(server.user_id);
-            return status?.online ?? true; // Default to true if unknown
-        },
-        [serverStatuses],
-    );
+    // Setup retry interval
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const now = Date.now();
+            const serversToRetry = servers.filter((server) => {
+                const retryInfo = serverRetries.get(server.user_id);
+                const status = serverStatuses.get(server.user_id);
+                return (
+                    retryInfo &&
+                    retryInfo.nextRetry <= now &&
+                    retryInfo.retryCount <= MAX_RETRY_COUNT &&
+                    !status?.online
+                );
+            });
 
-    // Helper function to check if server is accessible (online AND WebSocket connected)
-    const isServerAccessible = useCallback(
-        (server: ServerRecord) => {
-            const status = serverStatuses.get(server.user_id);
-            const isOnline = status?.online ?? true;
-            const isWebSocketConnected =
-                connectionStates.get(server.user_id) ?? false;
-            return isOnline && isWebSocketConnected;
-        },
-        [serverStatuses, connectionStates],
-    );
+            if (serversToRetry.length > 0) {
+                console.log(
+                    `Retrying ${serversToRetry.length} offline servers`,
+                );
+                verifyServers(serversToRetry);
+            }
+        }, 60000); // Check every minute
+
+        return () => clearInterval(interval);
+    }, [servers, serverRetries, serverStatuses, verifyServers]);
 
     if (isLoading) {
         return (
@@ -321,16 +595,19 @@ export default function HomePage() {
                         const displayName = getServerDisplayName(server);
                         const description = getServerDescription(server);
                         const status = serverStatuses.get(server.user_id);
+                        const retryInfo = serverRetries.get(server.user_id);
                         const serverIcon = status?.metadata?.icon;
+                        const isLeaving = leavingServers.has(server.user_id);
+                        const retryTimeString = getRetryTimeString(server);
 
                         return (
                             <Card
                                 key={server.user_id}
-                                className={`hover:bg-muted ease-snappy transition-all ${
+                                className={`ease-snappy transition-all ${
                                     !isServerAccessible(server)
                                         ? "cursor-not-allowed opacity-60"
-                                        : "cursor-pointer"
-                                }`}
+                                        : "hover:bg-muted cursor-pointer"
+                                } ${isLeaving ? "pointer-events-none opacity-50" : ""}`}
                                 onClick={() => {
                                     const accessible =
                                         isServerAccessible(server);
@@ -343,7 +620,18 @@ export default function HomePage() {
                             >
                                 <CardHeader>
                                     <div className="flex items-center gap-3">
-                                        <div className="relative">
+                                        <div
+                                            className={`relative ${!isServerAccessible(server) ? "" : "cursor-pointer"}`}
+                                            onClick={() => {
+                                                if (
+                                                    isServerAccessible(server)
+                                                ) {
+                                                    navigate({
+                                                        to: `/servers/${server.user_id}`,
+                                                    });
+                                                }
+                                            }}
+                                        >
                                             {serverIcon ? (
                                                 <img
                                                     src={serverIcon}
@@ -361,9 +649,7 @@ export default function HomePage() {
                                                 />
                                             ) : null}
                                             <ServerIcon
-                                                className={`h-10 w-10 ${
-                                                    serverIcon ? "hidden" : ""
-                                                }`}
+                                                className={`h-10 w-10 ${serverIcon ? "hidden" : ""}`}
                                             />
                                             <div
                                                 className={`border-background absolute -right-1 -bottom-1 h-3 w-3 rounded-full border-2 ${
@@ -384,14 +670,18 @@ export default function HomePage() {
                                                             server,
                                                         )
                                                             ? "default"
-                                                            : "secondary"
+                                                            : retryInfo
+                                                              ? "outline"
+                                                              : "secondary"
                                                     }
                                                 >
                                                     {isServerAccessible(server)
                                                         ? "Connected"
-                                                        : online
-                                                          ? "Connecting..."
-                                                          : "Offline"}
+                                                        : retryInfo
+                                                          ? "Retrying"
+                                                          : online
+                                                            ? "Connecting..."
+                                                            : "Offline"}
                                                 </Badge>
                                                 {status?.metadata && (
                                                     <Badge
@@ -410,6 +700,37 @@ export default function HomePage() {
                                                 )}
                                             </div>
                                         </div>
+                                        <div className="flex gap-1">
+                                            {!online && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 w-8 p-0"
+                                                    onClick={() =>
+                                                        handleRetryServer(
+                                                            server,
+                                                        )
+                                                    }
+                                                    title="Retry Connection"
+                                                >
+                                                    <RefreshCw className="h-4 w-4" />
+                                                </Button>
+                                            )}
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-destructive hover:text-destructive hover:bg-destructive/10 hover:border-destructive h-8 w-8 border-1 p-0"
+                                                onClick={(
+                                                    e: React.MouseEvent,
+                                                ) => {
+                                                    e.stopPropagation();
+                                                    handleLeaveServer(server);
+                                                }}
+                                                title="Leave Server"
+                                            >
+                                                <LogOut className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 </CardHeader>
                                 <CardContent>
@@ -423,6 +744,11 @@ export default function HomePage() {
                                                 server.joined_at,
                                             ).toLocaleDateString()}
                                         </p>
+                                        {retryTimeString && (
+                                            <p className="text-yellow-600 dark:text-yellow-400">
+                                                {retryTimeString}
+                                            </p>
+                                        )}
                                     </div>
                                 </CardContent>
                             </Card>

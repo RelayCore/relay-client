@@ -8,8 +8,13 @@ import {
     getUsers,
     getRoles,
     Channel,
+    leaveServer as apiLeaveServer,
 } from "@/api/server";
-import { getServerById, ServerRecord } from "@/storage/server-store";
+import {
+    getServerById,
+    ServerRecord,
+    removeServer,
+} from "@/storage/server-store";
 import {
     MESSAGE_TYPES,
     OnlineUsersData,
@@ -17,6 +22,7 @@ import {
     webSocketManager,
     WebSocketMessage,
 } from "@/websocket/websocket-manager";
+import { toast } from "sonner";
 
 interface ServerContextState {
     // Server data
@@ -41,6 +47,7 @@ interface ServerContextState {
     toggleMemberList: () => void;
     refreshServerData: () => Promise<void>;
     clearServerStatusCache: () => void;
+    leaveCurrentServer: () => Promise<void>;
     getSelectedChannel: () => Channel | null;
     getSelectedVoiceChannel: () => Channel | null;
     getUserById: (userId: string) => User | null;
@@ -274,6 +281,38 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         };
     }, [userId]);
 
+    // Leave current server
+    const leaveCurrentServer = React.useCallback(async () => {
+        if (!userId || !serverRecord) return;
+
+        try {
+            // Try to leave gracefully
+            await apiLeaveServer(serverRecord.server_url, userId);
+            toast.success("Successfully left the server");
+        } catch (error) {
+            if (
+                error instanceof Error &&
+                error.message.includes("Cannot leave server: you are the owner")
+            ) {
+                toast.error("Cannot leave server: you are the owner");
+                return;
+            }
+            toast.warning("Failed to notify server, but removed locally");
+        }
+
+        // Disconnect websocket
+        webSocketManager.disconnect(userId);
+
+        // Remove from local storage
+        await removeServer(serverRecord.server_url, userId);
+
+        // Clear server status cache
+        clearServerStatusCache();
+
+        // Navigate back to home
+        window.location.href = "/";
+    }, [userId, serverRecord, clearServerStatusCache]);
+
     const contextValue: ServerContextState = {
         serverRecord,
         serverInfo,
@@ -290,6 +329,7 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         toggleMemberList,
         refreshServerData,
         clearServerStatusCache,
+        leaveCurrentServer,
         getSelectedChannel,
         getSelectedVoiceChannel,
         getUserById,
