@@ -96,9 +96,22 @@ export default function ChannelList({
                         channel.is_voice &&
                         Array.isArray(channel.participants)
                     ) {
+                        const participants: VoiceParticipant[] =
+                            channel.participants.map((p) => ({
+                                id: p.id,
+                                user_id: p.user_id,
+                                username: p.username,
+                                nickname: p.nickname,
+                                profile_picture_url: p.profile_picture_url,
+                                is_muted: p.is_muted || false,
+                                is_deafened: p.is_deafened || false,
+                                is_speaking: p.is_speaking || false,
+                                joined_at: p.joined_at,
+                            }));
+
                         newVoiceStates.set(channel.id, {
-                            participantCount: channel.participants.length,
-                            participants: channel.participants,
+                            participantCount: participants.length,
+                            participants: participants,
                         });
                     }
                 }
