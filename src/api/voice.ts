@@ -146,7 +146,8 @@ export class VoiceAPI {
 // WebRTC Audio Manager
 export class VoiceAudioManager {
     private peerConnection: RTCPeerConnection | null = null;
-    private localStream: MediaStream | null = null;
+    private rawMicStream: MediaStream | null = null;
+    private outgoingStream: MediaStream | null = null;
     private remoteStreams = new Map<string, MediaStream>();
     private audioElements = new Map<string, HTMLAudioElement>();
     private userVolumes = new Map<string, number>();
@@ -172,10 +173,12 @@ export class VoiceAudioManager {
         keyup: (e: KeyboardEvent) => void;
     } | null = null;
 
-    private speakingCheckInterval: NodeJS.Timeout | null = null;
     private speakingStopTimeout: NodeJS.Timeout | null = null;
+    private streamDisableTimeout: NodeJS.Timeout | null = null;
     private lastSentSpeakingState = false;
     private speakingStopDelay = 500;
+    private streamDisableDelay = 300;
+    private lastTrackEnabledState = false;
 
     constructor() {
         this.loadSettings();
@@ -227,21 +230,11 @@ export class VoiceAudioManager {
 
         this.peerConnection = new RTCPeerConnection(config);
 
-        // Handle remote streams
         this.peerConnection.ontrack = (event) => {
-            console.log("Received remote track:", event.track.kind);
             const [remoteStream] = event.streams;
             if (remoteStream && event.track.kind === "audio") {
                 this.handleRemoteStream(remoteStream);
             }
-        };
-
-        // Handle connection state changes
-        this.peerConnection.onconnectionstatechange = () => {
-            console.log(
-                "WebRTC connection state:",
-                this.peerConnection?.connectionState,
-            );
         };
 
         return this.peerConnection;
@@ -250,19 +243,16 @@ export class VoiceAudioManager {
     private handleRemoteStream(stream: MediaStream): void {
         if (this.isDeafened) return;
 
-        // Create audio element for playback
         const audio = document.createElement("audio");
         audio.srcObject = stream;
         audio.autoplay = true;
         audio.volume = this.outputVolume;
         document.body.appendChild(audio);
 
-        // Store for cleanup
         const streamId = stream.id;
         this.audioElements.set(streamId, audio);
         this.remoteStreams.set(streamId, stream);
 
-        // Apply user volume if available
         const userVolume = this.getUserVolume(streamId);
         audio.volume = this.outputVolume * userVolume;
     }
@@ -282,77 +272,77 @@ export class VoiceAudioManager {
                 },
             };
 
-            this.localStream =
+            this.rawMicStream =
                 await navigator.mediaDevices.getUserMedia(constraints);
-            await this.setupAudioAnalysis();
+
+            this.outgoingStream = new MediaStream(
+                this.rawMicStream
+                    .getAudioTracks()
+                    .map((track) => track.clone()),
+            );
+
+            this.setOutgoingStreamEnabled(false);
+            this.lastTrackEnabledState = false;
+
+            setTimeout(async () => {
+                if (this.rawMicStream) {
+                    await this.setupAudioAnalysis();
+                }
+            }, 1000);
+
             this.setupPushToTalkListeners();
-            return this.localStream;
+            return this.rawMicStream;
         } catch (error) {
             throw new Error(`Failed to get microphone access: ${error}`);
         }
     }
 
     private async setupAudioAnalysis(): Promise<void> {
-        if (!this.localStream) return;
+        if (!this.rawMicStream || this.audioContext) return;
 
         this.audioContext = new AudioContext();
+
         this.microphoneSource = this.audioContext.createMediaStreamSource(
-            this.localStream,
+            this.rawMicStream,
         );
         this.analyser = this.audioContext.createAnalyser();
         this.gainNode = this.audioContext.createGain();
 
         this.analyser.fftSize = 512;
         this.analyser.smoothingTimeConstant = 0.3;
-        this.gainNode.gain.value = this.inputVolume;
+        this.gainNode.gain.value = Math.max(this.inputVolume, 1.0);
 
         this.microphoneSource.connect(this.gainNode);
         this.gainNode.connect(this.analyser);
 
-        // Start monitoring speaking status
         this.startSpeakingDetection();
     }
 
     private startSpeakingDetection(): void {
-        if (this.speakingCheckInterval) {
-            clearInterval(this.speakingCheckInterval);
-        }
+        const checkSpeaking = () => {
+            if (!this.analyser) return;
 
-        this.speakingCheckInterval = setInterval(() => {
             const volume = this.getAudioLevel();
             const shouldTransmit = this.pushToTalkMode
                 ? this.isPushToTalkActive
                 : volume > this.voiceActivationThreshold;
 
+            const shouldEnable =
+                shouldTransmit && !this.isMuted && !this.isDeafened;
+
+            this.setOutgoingStreamEnabledWithDelay(shouldEnable);
+
             if (shouldTransmit !== this.isVoiceActivated) {
                 this.isVoiceActivated = shouldTransmit;
                 this.handleSpeakingStateChange(shouldTransmit);
             }
-        }, 100); // Check every 100ms
-    }
 
-    private handleSpeakingStateChange(isSpeaking: boolean): void {
-        if (isSpeaking) {
-            // Started speaking
-            if (this.speakingStopTimeout) {
-                clearTimeout(this.speakingStopTimeout);
-                this.speakingStopTimeout = null;
+            if (this.analyser) {
+                requestAnimationFrame(checkSpeaking);
             }
+        };
 
-            if (!this.lastSentSpeakingState) {
-                this.lastSentSpeakingState = true;
-                this.onSpeakingChange?.(true);
-            }
-        } else {
-            // Stopped speaking - delay the notification
-            if (this.lastSentSpeakingState && !this.speakingStopTimeout) {
-                this.speakingStopTimeout = setTimeout(() => {
-                    this.lastSentSpeakingState = false;
-                    this.onSpeakingChange?.(false);
-                    this.speakingStopTimeout = null;
-                }, this.speakingStopDelay);
-            }
-        }
+        requestAnimationFrame(checkSpeaking);
     }
 
     private getAudioLevel(): number {
@@ -368,15 +358,69 @@ export class VoiceAudioManager {
         }
 
         const rms = Math.sqrt(sum / bufferLength);
-        if (rms < 0.0001) return -100;
+
+        if (rms < 0.001) return -100;
+
         return 20 * Math.log10(rms);
     }
 
-    addTrackToPeerConnection(): void {
-        if (!this.peerConnection || !this.localStream) return;
+    private setOutgoingStreamEnabled(enabled: boolean): void {
+        if (this.outgoingStream) {
+            this.outgoingStream.getAudioTracks().forEach((track) => {
+                track.enabled = enabled;
+            });
+        }
+    }
 
-        this.localStream.getTracks().forEach((track) => {
-            this.peerConnection!.addTrack(track, this.localStream!);
+    private setOutgoingStreamEnabledWithDelay(enabled: boolean): void {
+        if (enabled) {
+            if (this.streamDisableTimeout) {
+                clearTimeout(this.streamDisableTimeout);
+                this.streamDisableTimeout = null;
+            }
+
+            if (!this.lastTrackEnabledState) {
+                this.setOutgoingStreamEnabled(true);
+                this.lastTrackEnabledState = true;
+            }
+        } else {
+            if (this.lastTrackEnabledState && !this.streamDisableTimeout) {
+                this.streamDisableTimeout = setTimeout(() => {
+                    this.setOutgoingStreamEnabled(false);
+                    this.lastTrackEnabledState = false;
+                    this.streamDisableTimeout = null;
+                }, this.streamDisableDelay);
+            }
+        }
+    }
+
+    private handleSpeakingStateChange(isSpeaking: boolean): void {
+        if (isSpeaking) {
+            if (this.speakingStopTimeout) {
+                clearTimeout(this.speakingStopTimeout);
+                this.speakingStopTimeout = null;
+            }
+
+            if (!this.lastSentSpeakingState) {
+                this.lastSentSpeakingState = true;
+                this.onSpeakingChange?.(true);
+            }
+        } else {
+            if (this.lastSentSpeakingState && !this.speakingStopTimeout) {
+                this.speakingStopTimeout = setTimeout(() => {
+                    this.lastSentSpeakingState = false;
+                    this.onSpeakingChange?.(false);
+                    this.speakingStopTimeout = null;
+                }, this.speakingStopDelay);
+            }
+        }
+    }
+
+    addTrackToPeerConnection(): void {
+        if (!this.peerConnection || !this.outgoingStream) return;
+
+        this.outgoingStream.getTracks().forEach((track) => {
+            this.peerConnection!.addTrack(track, this.outgoingStream!);
         });
     }
 
@@ -416,7 +460,7 @@ export class VoiceAudioManager {
 
     private updateInputVolume(): void {
         if (this.gainNode) {
-            this.gainNode.gain.value = this.inputVolume;
+            this.gainNode.gain.value = Math.max(this.inputVolume, 1.0);
         }
     }
 
@@ -524,11 +568,21 @@ export class VoiceAudioManager {
 
     setMuted(muted: boolean): void {
         this.isMuted = muted;
-        if (this.localStream) {
-            this.localStream.getAudioTracks().forEach((track) => {
+        if (this.rawMicStream) {
+            this.rawMicStream.getAudioTracks().forEach((track) => {
                 track.enabled = !muted;
             });
         }
+        const shouldEnable =
+            !muted && !this.isDeafened && this.isVoiceActivated;
+
+        if (this.streamDisableTimeout) {
+            clearTimeout(this.streamDisableTimeout);
+            this.streamDisableTimeout = null;
+        }
+
+        this.setOutgoingStreamEnabled(shouldEnable);
+        this.lastTrackEnabledState = shouldEnable;
     }
 
     setDeafened(deafened: boolean): void {
@@ -539,20 +593,14 @@ export class VoiceAudioManager {
 
         if (deafened) {
             this.setMuted(true);
-        }
-    }
-
-    setPushToTalkMode(enabled: boolean): void {
-        this.pushToTalkMode = enabled;
-        if (!enabled) {
-            this.isPushToTalkActive = false;
+        } else {
+            this.setMuted(this.isMuted);
         }
     }
 
     cleanup(): void {
-        if (this.speakingCheckInterval) {
-            clearInterval(this.speakingCheckInterval);
-            this.speakingCheckInterval = null;
+        if (this.analyser) {
+            this.analyser = null;
         }
 
         if (this.speakingStopTimeout) {
@@ -560,7 +608,11 @@ export class VoiceAudioManager {
             this.speakingStopTimeout = null;
         }
 
-        // Remove event listeners
+        if (this.streamDisableTimeout) {
+            clearTimeout(this.streamDisableTimeout);
+            this.streamDisableTimeout = null;
+        }
+
         if (this.keyEventHandlers) {
             window.removeEventListener(
                 "keydown",
@@ -570,25 +622,26 @@ export class VoiceAudioManager {
             this.keyEventHandlers = null;
         }
 
-        // Close peer connection
         if (this.peerConnection) {
             this.peerConnection.close();
             this.peerConnection = null;
         }
 
-        // Clean up audio context
         if (this.audioContext) {
             this.audioContext.close();
             this.audioContext = null;
         }
 
-        // Stop local stream
-        if (this.localStream) {
-            this.localStream.getTracks().forEach((track) => track.stop());
-            this.localStream = null;
+        if (this.rawMicStream) {
+            this.rawMicStream.getTracks().forEach((track) => track.stop());
+            this.rawMicStream = null;
         }
 
-        // Clean up audio elements
+        if (this.outgoingStream) {
+            this.outgoingStream.getTracks().forEach((track) => track.stop());
+            this.outgoingStream = null;
+        }
+
         this.audioElements.forEach((audio) => audio.remove());
         this.audioElements.clear();
         this.remoteStreams.clear();
@@ -661,7 +714,6 @@ export class VoiceClient {
             await this.api.joinChannel(channelId);
             this.currentChannelId = channelId;
 
-            // Load initial participants
             const participants = await this.api.getParticipants(channelId);
             participants.forEach((p) => this.participants.set(p.user_id, p));
         } catch (error) {
@@ -677,10 +729,8 @@ export class VoiceClient {
 
         try {
             await this.api.leaveChannel(channelToLeave);
-            console.log(`Successfully left voice channel ${channelToLeave}`);
         } catch (error) {
             console.error("Failed to leave voice channel via API:", error);
-            // Continue with cleanup even if API call fails
         } finally {
             this.cleanup();
         }
@@ -705,42 +755,15 @@ export class VoiceClient {
         await this.api.updateState(this.currentChannelId, muted, deafened);
     }
 
-    setPushToTalkMode(enabled: boolean): void {
-        this.audioManager.setPushToTalkMode(enabled);
-    }
-
-    setUserVolume(userId: string, volume: number): void {
-        this.audioManager.setUserVolume(userId, volume);
-    }
-
-    getUserVolume(userId: string): number {
-        return this.audioManager.getUserVolume(userId);
-    }
-
-    resetUserVolume(userId: string): void {
-        this.audioManager.resetUserVolume(userId);
-    }
-
-    getAllUserVolumes(): Map<string, number> {
-        return this.audioManager.getAllUserVolumes();
-    }
-
-    updateSettings(settings: Partial<SettingsInterface>): void {
-        this.audioManager.updateSettings(settings);
-    }
-
     // WebRTC Signaling Handlers
     handleWebRTCConfig(data: {
         channel_id: number;
         config: RTCConfiguration;
     }): void {
-        console.log("Received WebRTC config:", data);
         // Config is handled when creating offer
     }
 
     async handleCreateOffer(data: { channel_id: number }): Promise<void> {
-        console.log("Creating WebRTC offer for channel:", data.channel_id);
-
         try {
             const config: RTCConfiguration = {
                 iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
@@ -749,7 +772,6 @@ export class VoiceClient {
             const pc = await this.audioManager.createPeerConnection(config);
             this.audioManager.addTrackToPeerConnection();
 
-            // Set up ICE candidate handling
             pc.onicecandidate = (event) => {
                 if (event.candidate && this.sendSignalingMessage) {
                     this.sendSignalingMessage({
@@ -764,7 +786,6 @@ export class VoiceClient {
                 }
             };
 
-            // Create and send offer
             const offer = await pc.createOffer({
                 offerToReceiveAudio: true,
                 offerToReceiveVideo: false,
@@ -795,8 +816,6 @@ export class VoiceClient {
         channel_id: number;
         answer: { type: string; sdp: string };
     }): Promise<void> {
-        console.log("Received WebRTC answer:", data);
-
         const pc = this.audioManager.peerConnectionInstance;
         if (!pc) {
             console.error("No peer connection available for answer");
@@ -826,8 +845,6 @@ export class VoiceClient {
             sdpMLineIndex: number | null;
         };
     }): Promise<void> {
-        console.log("Received ICE candidate:", data);
-
         const pc = this.audioManager.peerConnectionInstance;
         if (!pc) {
             console.error("No peer connection available for ICE candidate");
@@ -852,8 +869,6 @@ export class VoiceClient {
         connected: boolean;
         state?: string;
     }): void {
-        console.log("WebRTC connection status:", data);
-
         if (this.sendSignalingMessage) {
             this.sendSignalingMessage({
                 type: "webrtc_connection_status",
@@ -869,7 +884,6 @@ export class VoiceClient {
         channel_id: number;
         quality: string;
     }): void {
-        console.log("Connection quality update:", data);
         // Handle connection quality updates from server
     }
 
@@ -902,7 +916,6 @@ export class VoiceClient {
     }
 
     private cleanup(): void {
-        console.log("Cleaning up voice client...");
         this.currentChannelId = null;
         this.participants.clear();
         this.audioManager.cleanup();
