@@ -61,6 +61,11 @@ export interface DeleteMessageResponse {
     channel_id: number;
 }
 
+export interface EditMessageRequest {
+    message_id: number;
+    content: string;
+}
+
 export interface User {
     id: string;
     username: string;
@@ -317,6 +322,32 @@ export async function deleteMessage(
     if (!response.ok) {
         throw new Error(`Failed to delete message: ${response.statusText}`);
     }
+    return response.json();
+}
+
+export async function editMessage(
+    serverUrl: string,
+    userId: string,
+    messageId: number,
+    content: string,
+): Promise<Message> {
+    const response = await fetch(`${serverUrl}/messages/edit`, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${userId}`,
+        },
+        body: JSON.stringify({
+            message_id: messageId,
+            content: content,
+        }),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to edit message");
+    }
+
     return response.json();
 }
 

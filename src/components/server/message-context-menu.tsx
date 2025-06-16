@@ -29,6 +29,7 @@ interface MessageContextMenuProps {
     onMessageDeleted?: (messageId: number) => void;
     onMessagePinned?: (messageId: number) => void;
     onMessageUnpinned?: (messageId: number) => void;
+    onMessageEdit?: (messageId: number) => void;
 }
 
 export function MessageContextMenu({
@@ -42,6 +43,7 @@ export function MessageContextMenu({
     onMessageDeleted,
     onMessagePinned,
     onMessageUnpinned,
+    onMessageEdit,
 }: MessageContextMenuProps) {
     const isOwnMessage = message.author_id === currentUserId;
     const canPin = canPinInChannel(channel, currentUser);
@@ -100,8 +102,7 @@ export function MessageContextMenu({
     };
 
     const handleEditMessage = () => {
-        // TODO: Implement edit functionality
-        toast.info("Edit functionality coming soon");
+        onMessageEdit?.(message.id);
     };
 
     return (

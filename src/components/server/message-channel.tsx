@@ -22,6 +22,7 @@ import {
     getChannels,
     Channel,
     canWriteToChannel,
+    editMessage,
 } from "@/api/server";
 import {
     webSocketManager,
@@ -29,6 +30,7 @@ import {
     MessageBroadcast,
     MessageDeletedBroadcast,
     MESSAGE_TYPES,
+    MessageEditedBroadcast,
 } from "@/websocket/websocket-manager";
 import { MessageContextMenu } from "./message-context-menu";
 import { UserPopover } from "./user-popup";
@@ -38,6 +40,7 @@ import { useServer } from "@/contexts/server-context";
 import { EmojiPopup } from "./emoji-popup";
 import { CustomVideoPlayer } from "./video-player";
 import { UserAvatar } from "./user-avatar";
+import { toast } from "sonner";
 
 export interface MessageChannelProps {
     channelId: number;
@@ -70,6 +73,10 @@ export default function MessageChannel({
     const [currentChannel, setCurrentChannel] = React.useState<Channel | null>(
         null,
     );
+    const [editingMessageId, setEditingMessageId] = React.useState<
+        number | null
+    >(null);
+    const [editingText, setEditingText] = React.useState("");
     const messagesContainerRef = React.useRef<HTMLDivElement>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const dropZoneRef = React.useRef<HTMLDivElement>(null);
@@ -149,6 +156,25 @@ export default function MessageChannel({
                     }
                     break;
                 }
+                case MESSAGE_TYPES.MESSAGE_EDITED: {
+                    const editData = message.data as MessageEditedBroadcast;
+                    if (editData.channel_id === channelId) {
+                        setMessages((prev) =>
+                            prev.map((msg) =>
+                                msg.id === editData.id
+                                    ? { ...msg, content: editData.content }
+                                    : msg,
+                            ),
+                        );
+
+                        // If we're currently editing this message, cancel the edit
+                        if (editingMessageId === editData.id) {
+                            setEditingMessageId(null);
+                            setEditingText("");
+                        }
+                    }
+                    break;
+                }
             }
         };
 
@@ -165,7 +191,7 @@ export default function MessageChannel({
                 handleWebSocketMessage,
             );
         };
-    }, [currentUserId, channelId]);
+    }, [currentUserId, channelId, editingMessageId]);
 
     // Fetch messages when channelId changes
     React.useEffect(() => {
@@ -506,6 +532,50 @@ export default function MessageChannel({
         [messageText],
     );
 
+    const handleMessageEdit = React.useCallback(
+        (messageId: number) => {
+            const messageToEdit = messages.find((msg) => msg.id === messageId);
+            if (messageToEdit) {
+                setEditingMessageId(messageId);
+                setEditingText(messageToEdit.content);
+            }
+        },
+        [messages],
+    );
+
+    const handleEditSave = async (messageId: number, newContent: string) => {
+        if (!currentUserId || !newContent.trim()) return;
+
+        try {
+            const updatedMessage = await editMessage(
+                serverUrl,
+                currentUserId,
+                messageId,
+                newContent.trim(),
+            );
+
+            setMessages((prev) =>
+                prev.map((msg) =>
+                    msg.id === messageId
+                        ? { ...msg, content: updatedMessage.content }
+                        : msg,
+                ),
+            );
+
+            setEditingMessageId(null);
+            setEditingText("");
+            toast.success("Message edited");
+        } catch (error) {
+            console.error("Failed to edit message:", error);
+            toast.error("Failed to edit message");
+        }
+    };
+
+    const handleEditCancel = () => {
+        setEditingMessageId(null);
+        setEditingText("");
+    };
+
     if (loading) {
         return <MessageChannelSkeleton />;
     }
@@ -675,6 +745,11 @@ export default function MessageChannel({
                                     showHeader={showHeader}
                                     currentUserId={currentUserId}
                                     onImageClick={setOpenedImage}
+                                    isEditing={editingMessageId === message.id}
+                                    editingText={editingText}
+                                    onEditingTextChange={setEditingText}
+                                    onEditSave={handleEditSave}
+                                    onEditCancel={handleEditCancel}
                                 />
                             );
 
@@ -690,6 +765,7 @@ export default function MessageChannel({
                                     onMessageDeleted={handleMessageDeleted}
                                     onMessagePinned={handleMessagePinned}
                                     onMessageUnpinned={handleMessageUnpinned}
+                                    onMessageEdit={handleMessageEdit}
                                 >
                                     {messageElement}
                                 </MessageContextMenu>
@@ -851,11 +927,21 @@ function MessageItem({
     showHeader = true,
     currentUserId,
     onImageClick,
+    isEditing = false,
+    editingText = "",
+    onEditingTextChange,
+    onEditSave,
+    onEditCancel,
 }: {
     message: Message;
     showHeader?: boolean;
     currentUserId?: string;
     onImageClick?: (attachment: Attachment) => void;
+    isEditing?: boolean;
+    editingText?: string;
+    onEditingTextChange?: (text: string) => void;
+    onEditSave?: (messageId: number, content: string) => void;
+    onEditCancel?: () => void;
 }) {
     const { users } = useMembers();
     const formattedDate = formatMessageDate(message.created_at);
@@ -885,15 +971,111 @@ function MessageItem({
         .find((role) => role.color);
     const roleColor = highestColoredRole?.color;
 
+    const editTextareaRef = React.useRef<HTMLTextAreaElement>(null);
+    const [hasInitialFocus, setHasInitialFocus] = React.useState(false);
+
+    // Focus textarea when editing starts
+    React.useEffect(() => {
+        if (isEditing && editTextareaRef.current && !hasInitialFocus) {
+            const textarea = editTextareaRef.current;
+            textarea.focus();
+            // Set cursor to end of text
+            const length = editingText.length;
+            textarea.setSelectionRange(length, length);
+            setHasInitialFocus(true);
+        }
+
+        if (!isEditing) {
+            setHasInitialFocus(false);
+        }
+    }, [isEditing, hasInitialFocus, editingText.length]);
+
+    const handleEditKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            onEditSave?.(message.id, editingText);
+        } else if (e.key === "Escape") {
+            e.preventDefault();
+            onEditCancel?.();
+        }
+    };
+
+    const handleTextareaChange = React.useCallback(
+        (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+            onEditingTextChange?.(e.target.value);
+        },
+        [onEditingTextChange],
+    );
+
+    const MessageContent = React.useMemo(() => {
+        if (isEditing) {
+            return (
+                <div>
+                    <textarea
+                        ref={editTextareaRef}
+                        value={editingText}
+                        onChange={handleTextareaChange}
+                        onKeyDown={handleEditKeyDown}
+                        className="w-full resize-none border-none bg-transparent p-0 text-sm outline-none"
+                        placeholder="Edit your message..."
+                        style={{
+                            height: "auto",
+                            minHeight: "20px",
+                            fontFamily: "inherit",
+                        }}
+                        rows={editingText.split("\n").length}
+                    />
+                    <div className="flex gap-2 text-xs">
+                        <Button
+                            size="sm"
+                            onClick={() =>
+                                onEditSave?.(message.id, editingText)
+                            }
+                            disabled={!editingText.trim()}
+                        >
+                            Save
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={onEditCancel}
+                        >
+                            Cancel
+                        </Button>
+                        <span className="text-muted-foreground flex items-center">
+                            Press Enter to save • Escape to cancel
+                        </span>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="text-sm break-words whitespace-pre-wrap">
+                {message.content}
+            </div>
+        );
+    }, [
+        isEditing,
+        editingText,
+        message.content,
+        message.id,
+        handleTextareaChange,
+        handleEditKeyDown,
+        onEditSave,
+        onEditCancel,
+    ]);
+
     return (
         <div
             className={cn(
                 "hover:bg-accent/20 -mx-3 px-3 py-1",
                 showHeader ? "mt-1" : "mt-0",
+                isEditing && "bg-accent/10",
             )}
         >
             {(showHeader && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-start gap-2">
                     <UserPopover user={user} currentUserId={currentUserId}>
                         <div className="cursor-pointer self-start">
                             <UserAvatar
@@ -904,38 +1086,32 @@ function MessageItem({
                         </div>
                     </UserPopover>
 
-                    <div>
-                        <UserPopover user={user} currentUserId={currentUserId}>
-                            <span
-                                className="mr-2 cursor-pointer text-sm font-medium hover:underline"
-                                style={{ color: roleColor }}
+                    <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex items-center gap-2">
+                            <UserPopover
+                                user={user}
+                                currentUserId={currentUserId}
                             >
-                                {displayName}
+                                <span
+                                    className="cursor-pointer text-sm font-medium hover:underline"
+                                    style={{ color: roleColor }}
+                                >
+                                    {displayName}
+                                </span>
+                            </UserPopover>
+                            <span className="text-muted-foreground text-xs">
+                                {formattedDate}
                             </span>
-                        </UserPopover>
-                        <span className="text-muted-foreground text-xs">
-                            {formattedDate}
-                        </span>
-                        <div
-                            className={cn(
-                                "text-sm break-words whitespace-pre-wrap",
-                                showHeader ? "" : "mt-0.5",
+                            {isEditing && (
+                                <span className="text-muted-foreground text-xs">
+                                    (editing)
+                                </span>
                             )}
-                        >
-                            {message.content}
                         </div>
+                        {MessageContent}
                     </div>
                 </div>
-            )) || (
-                <div
-                    className={cn(
-                        "ml-12 text-sm break-words whitespace-pre-wrap",
-                        showHeader ? "" : "mt-0.5",
-                    )}
-                >
-                    {message.content}
-                </div>
-            )}
+            )) || <div className="ml-12">{MessageContent}</div>}
 
             {hasAttachments && (
                 <div

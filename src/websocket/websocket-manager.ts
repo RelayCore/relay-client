@@ -2,6 +2,7 @@ import { ServerRecord } from "@/storage/server-store";
 import { VoiceClient, VoiceEventData } from "@/api/voice";
 import { toast } from "sonner";
 import { inDevelopment } from "@/config";
+import { Attachment } from "@/api/server";
 
 export interface WebSocketMessage {
     type: string;
@@ -34,11 +35,25 @@ export interface MessageDeletedBroadcast {
     deleted_by: string;
 }
 
+export interface MessageEditedBroadcast {
+    id: number;
+    channel_id: number;
+    author_id: string;
+    content: string;
+    created_at: string;
+    updated_at: string;
+    username?: string;
+    nickname?: string;
+    attachments?: Attachment[];
+    pinned: boolean;
+}
+
 export const MESSAGE_TYPES = {
     ONLINE_USERS: "online_users",
     USER_STATUS: "user_status",
     MESSAGE_BROADCAST: "new_message",
     MESSAGE_DELETED: "message_deleted",
+    MESSAGE_EDITED: "message_edited",
     USER_JOINED_VOICE: "user_joined_voice",
     USER_LEFT_VOICE: "user_left_voice",
     VOICE_STATE_UPDATE: "voice_state_update",
