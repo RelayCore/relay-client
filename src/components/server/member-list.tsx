@@ -36,12 +36,16 @@ export default function MemberList({
             if (roles.length) {
                 // Sort roles by rank (higher rank first)
                 const sortedRoles = [...roles].sort((a, b) => b.rank - a.rank);
+                
+                // Track users that have already been added to a role group
+                const addedUserIds = new Set<string>();
 
                 // Only online members for role groups
                 sortedRoles.forEach((role) => {
                     const roleMembers = members.filter(
                         (member) =>
                             member.is_online &&
+                            !addedUserIds.has(member.id) &&
                             member.roles.some(
                                 (memberRole) => memberRole.id === role.id,
                             ),
@@ -55,12 +59,15 @@ export default function MemberList({
                             members: roleMembers,
                             position: role.rank,
                         });
+                        
+                        // Mark these users as added
+                        roleMembers.forEach(member => addedUserIds.add(member.id));
                     }
                 });
 
-                // Online members without any roles
+                // Online members without any roles or not yet added to any group
                 const onlineMembersWithoutRoles = members.filter(
-                    (m) => m.is_online && m.roles.length === 0,
+                    (m) => m.is_online && !addedUserIds.has(m.id) && m.roles.length === 0,
                 );
 
                 if (onlineMembersWithoutRoles.length > 0) {
@@ -126,10 +133,10 @@ export default function MemberList({
         <div className={cn("h-full w-full", className)}>
             <ScrollArea className="h-full">
                 {groups.map((group) => (
-                    <div key={group.id} className="mb-6">
+                    <div key={group.id}>
                         <div
                             className={cn(
-                                "text-muted-foreground mt-2 px-3 py-1 text-xs font-semibold",
+                                "text-muted-foreground mt-2 px-3 text-xs font-semibold",
                                 group.color && "text-foreground",
                             )}
                             style={{
