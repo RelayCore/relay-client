@@ -73,7 +73,16 @@ export default function ServerPage() {
     );
 
     const getSelectedChannelName = React.useCallback(() => {
-        if (!selectedChannelId) return "general";
+        if (!selectedChannelId) {
+            // Find the first non-voice channel
+            for (const group of channelGroups) {
+                const firstTextChannel = group.channels.find(
+                    (c) => !c.is_voice,
+                );
+                if (firstTextChannel) return firstTextChannel.name;
+            }
+            return "general"; // Fallback if no text channels found
+        }
 
         for (const group of channelGroups) {
             const channel = group.channels.find(
