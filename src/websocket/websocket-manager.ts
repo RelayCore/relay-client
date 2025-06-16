@@ -43,6 +43,12 @@ export const MESSAGE_TYPES = {
     USER_LEFT_VOICE: "user_left_voice",
     VOICE_STATE_UPDATE: "voice_state_update",
     SPEAKING_UPDATE: "speaking_update",
+    WEBRTC_CONFIG: "webrtc_config",
+    CREATE_WEBRTC_OFFER: "create_webrtc_offer",
+    WEBRTC_ANSWER: "webrtc_answer",
+    WEBRTC_ICE_CANDIDATE: "webrtc_ice_candidate",
+    WEBRTC_CONNECTION_STATUS: "webrtc_connection_status",
+    CONNECTION_QUALITY_UPDATE: "connection_quality_update",
 } as const;
 
 type MessageHandler = (message: WebSocketMessage) => void;
@@ -67,8 +73,8 @@ export class WebSocketConnection {
         private onConnectionChange?: (connected: boolean) => void,
     ) {
         this.voiceClient = new VoiceClient(server);
-        this.voiceClient.setBinaryMessageSender((data: ArrayBuffer) =>
-            this.sendBinaryMessage(data),
+        this.voiceClient.setSignalingMessageSender(
+            (message: WebSocketMessage) => this.send(message),
         );
     }
 
@@ -133,11 +139,8 @@ export class WebSocketConnection {
                                 message,
                             );
                             this.handleMessage(message);
-                        } else if (event.data instanceof ArrayBuffer) {
-                            console.log(
-                                `[WebSocket] Binary data received, length: ${event.data.byteLength}`,
-                            );
                         }
+                        // Remove binary message handling
                     } catch (error) {
                         console.error(
                             `[WebSocket] Failed to parse message:`,
@@ -272,6 +275,54 @@ export class WebSocketConnection {
                     message.data as VoiceEventData["speaking_update"],
                 );
                 break;
+            case MESSAGE_TYPES.WEBRTC_CONFIG:
+                this.voiceClient.handleWebRTCConfig(
+                    message.data as {
+                        channel_id: number;
+                        config: RTCConfiguration;
+                    },
+                );
+                break;
+            case MESSAGE_TYPES.CREATE_WEBRTC_OFFER:
+                this.voiceClient.handleCreateOffer(
+                    message.data as { channel_id: number },
+                );
+                break;
+            case MESSAGE_TYPES.WEBRTC_ANSWER:
+                this.voiceClient.handleWebRTCAnswer(
+                    message.data as {
+                        from: string;
+                        channel_id: number;
+                        answer: { type: string; sdp: string };
+                    },
+                );
+                break;
+            case MESSAGE_TYPES.WEBRTC_ICE_CANDIDATE:
+                this.voiceClient.handleWebRTCIceCandidate(
+                    message.data as {
+                        from: string;
+                        candidate: {
+                            candidate: string;
+                            sdpMid: string | null;
+                            sdpMLineIndex: number | null;
+                        };
+                    },
+                );
+                break;
+            case MESSAGE_TYPES.WEBRTC_CONNECTION_STATUS:
+                this.voiceClient.handleConnectionStatus(
+                    message.data as {
+                        channel_id: number;
+                        connected: boolean;
+                        state?: string;
+                    },
+                );
+                break;
+            case MESSAGE_TYPES.CONNECTION_QUALITY_UPDATE:
+                this.voiceClient.handleConnectionQuality(
+                    message.data as { channel_id: number; quality: string },
+                );
+                break;
         }
     }
 
@@ -288,16 +339,6 @@ export class WebSocketConnection {
             this.ws.send(JSON.stringify(message));
         } else {
             console.warn(`[WebSocket] Cannot send message - not connected`);
-        }
-    }
-
-    private sendBinaryMessage(data: ArrayBuffer) {
-        if (this.ws?.readyState === WebSocket.OPEN) {
-            this.ws.send(data);
-        } else {
-            console.warn(
-                `[WebSocket] Cannot send binary message - not connected`,
-            );
         }
     }
 
