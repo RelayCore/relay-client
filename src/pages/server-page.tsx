@@ -145,6 +145,7 @@ export default function ServerPage() {
             <ServerHeader
                 userId={userId}
                 serverUrl={serverRecord?.server_url || ""}
+                channelName={getSelectedChannelName()}
             />
 
             <ResizablePanelGroup

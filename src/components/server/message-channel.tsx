@@ -605,9 +605,6 @@ export default function MessageChannel({
                         </p>
                     </div>
                 )}
-                <div className="flex h-12 items-center gap-2 border-b p-3">
-                    <span className="text-lg font-medium">#{channelName}</span>
-                </div>
                 <div className="flex flex-grow items-center justify-center">
                     <div className="text-muted-foreground text-center">
                         <p className="text-lg font-semibold">
@@ -707,16 +704,12 @@ export default function MessageChannel({
                 </div>
             )}
 
-            <div className="flex h-12 items-center gap-2 border-b p-3">
-                <span className="text-lg font-medium">#{channelName}</span>
-            </div>
-
             <div
                 ref={messagesContainerRef}
                 className="flex-grow overflow-auto px-3 py-3"
             >
                 {messages.length === 0 ? (
-                    <div className="text-muted-foreground py-10 text-center">
+                    <div className="text-muted-foreground py-36 text-center">
                         <p className="text-lg font-semibold">
                             Welcome to #{channelName}!
                         </p>

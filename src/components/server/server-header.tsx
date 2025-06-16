@@ -28,6 +28,7 @@ export interface ServerHeaderProps {
     showBackButton?: boolean;
     onBackClick?: () => void;
     isOnSettingsPage?: boolean;
+    channelName?: string;
 }
 
 export default function ServerHeader({
@@ -37,6 +38,7 @@ export default function ServerHeader({
     showBackButton = false,
     onBackClick,
     isOnSettingsPage = false,
+    channelName,
 }: ServerHeaderProps) {
     const { serverInfo, loading } = useServerInfo();
     const { showMembers, toggleMemberList } = useMembers();
@@ -116,6 +118,14 @@ export default function ServerHeader({
                     </Button>
                 )}
                 <h1 className="font-medium">{serverInfo.name}</h1>
+                {channelName && (
+                    <>
+                        <span className="text-muted-foreground">/</span>
+                        <span className="text-muted-foreground">
+                            {channelName}
+                        </span>
+                    </>
+                )}
             </div>
 
             <div
