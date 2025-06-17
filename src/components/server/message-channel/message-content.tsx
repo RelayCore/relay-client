@@ -257,7 +257,7 @@ function OpenGraphPreviewSpan({
                         <img
                             src={imageUrl}
                             alt={title || "OpenGraph image"}
-                            className="h-auto max-h-24 w-full cursor-pointer rounded border object-contain transition-opacity hover:opacity-80"
+                            className="h-auto max-h-[98px] w-full cursor-pointer rounded border object-contain transition-opacity hover:opacity-80"
                             onClick={handleImageClick}
                             onError={(e) =>
                                 (e.currentTarget.style.display = "none")
@@ -273,7 +273,7 @@ function OpenGraphPreviewSpan({
                         {title || originalUrlText}
                     </div>
                     {description && (
-                        <div className="text-muted-foreground mt-1 line-clamp-3 text-xs">
+                        <div className="text-muted-foreground line-clamp-5 text-xs">
                             {description}
                         </div>
                     )}
