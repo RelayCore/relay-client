@@ -172,6 +172,10 @@ export function MessageInput({
                             <ProcessedMessageContent
                                 parts={displayParts}
                                 currentUserId={currentUserId}
+                                disabledFeatures={[
+                                    "imageLinks",
+                                    "openGraphPreviews",
+                                ]}
                             />
                         </div>
                     )}

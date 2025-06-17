@@ -13,6 +13,8 @@ export type OGData = {
     url: string;
 };
 
+export type DisabledFeature = "imageLinks" | "openGraphPreviews";
+
 /**
  * Component for rendering processed message content
  */
@@ -21,6 +23,7 @@ export function ProcessedMessageContent({
     currentUserId,
     ogDataMap,
     onImageClick,
+    disabledFeatures = [],
 }: {
     parts: MessageContentPart[];
     currentUserId?: string;
@@ -29,7 +32,11 @@ export function ProcessedMessageContent({
         attachment: Attachment,
         sourceElement?: HTMLElement,
     ) => void;
+    disabledFeatures?: DisabledFeature[];
 }) {
+    const isFeatureDisabled = (feature: DisabledFeature) =>
+        disabledFeatures.includes(feature);
+
     return (
         <>
             {parts.map((part, index) => {
@@ -45,7 +52,11 @@ export function ProcessedMessageContent({
                         );
                     case "link": {
                         const linkData = part.data;
-                        if (linkData?.isImageLink && linkData.url) {
+                        if (
+                            linkData?.isImageLink &&
+                            linkData.url &&
+                            !isFeatureDisabled("imageLinks")
+                        ) {
                             return (
                                 <ImageLinkAttachment
                                     key={index}
@@ -56,9 +67,11 @@ export function ProcessedMessageContent({
                             );
                         }
 
-                        const ogEntry = linkData?.url
-                            ? ogDataMap?.[linkData.url]
-                            : undefined;
+                        const ogEntry =
+                            linkData?.url &&
+                            !isFeatureDisabled("openGraphPreviews")
+                                ? ogDataMap?.[linkData.url]
+                                : undefined;
 
                         if (typeof ogEntry === "object" && ogEntry !== null) {
                             return (
