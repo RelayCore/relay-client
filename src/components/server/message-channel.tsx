@@ -268,7 +268,7 @@ function MentionSpan({
         >
             <span
                 className={cn(
-                    "cursor-pointer rounded px-1 py-0.25 text-xs font-medium whitespace-nowrap",
+                    "cursor-pointer rounded px-0.75 py-0.25 text-xs font-medium whitespace-nowrap",
                     user
                         ? isCurrentUser
                             ? "bg-yellow-500/20 text-yellow-600 hover:bg-yellow-500/30 dark:text-yellow-400"
