@@ -20,6 +20,7 @@ import { cn } from "@/utils/tailwind";
 import { UserPopover } from "./user-popup";
 import { useMembers } from "@/contexts/server-context";
 import { formatMessageDate } from "./message-channel";
+import { downloadFile } from "@/utils/assets";
 
 interface PinnedPopupProps {
     serverUrl: string;
@@ -249,14 +250,9 @@ function PinnedAttachmentItem({ attachment }: { attachment: Attachment }) {
     const fileSize = formatFileSize(attachment.file_size);
 
     // Download the attachment
-    const handleDownload = (e: React.MouseEvent) => {
+    const handleDownload = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        const link = document.createElement("a");
-        link.href = attachment.file_path;
-        link.download = attachment.file_name;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        await downloadFile(attachment.file_path, attachment.file_name);
     };
 
     if (isImage) {

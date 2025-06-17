@@ -43,6 +43,7 @@ import { UserAvatar } from "./user-avatar";
 import { MentionsPopup } from "./mention-popup";
 import { toast } from "sonner";
 import { cacheManager } from "@/utils/cache-manager";
+import { downloadFile } from "@/utils/assets";
 
 type MessageContentPart = {
     type: "text" | "mention" | "tag" | "link" | "emoji";
@@ -1150,12 +1151,10 @@ export default function MessageChannel({
                                 className="h-8 w-8"
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    const link = document.createElement("a");
-                                    link.href = openedImage.file_path;
-                                    link.download = openedImage.file_name;
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
+                                    downloadFile(
+                                        openedImage.file_path,
+                                        openedImage.file_name,
+                                    );
                                 }}
                             >
                                 <Download size={16} />
@@ -1669,14 +1668,9 @@ function AttachmentItem({
     };
 
     // Download the attachment
-    const handleDownload = (e: React.MouseEvent) => {
+    const handleDownload = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        const link = document.createElement("a");
-        link.href = attachment.file_path;
-        link.download = attachment.file_name;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        await downloadFile(attachment.file_path, attachment.file_name);
     };
 
     if (isImage) {
