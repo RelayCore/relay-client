@@ -346,9 +346,8 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                 }
 
                 case MESSAGE_TYPES.MESSAGE_BROADCAST: {
-                    const messageData = message.data as {
+                    const messageData = message.data as Message & {
                         channel_id: number;
-                        message: Message;
                     };
 
                     // Update the channel's last_message_at timestamp
@@ -360,7 +359,7 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                                     ? {
                                           ...channel,
                                           last_message_at:
-                                              messageData.message.created_at,
+                                              messageData.created_at,
                                       }
                                     : channel,
                             ),
@@ -372,12 +371,9 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                         updateChannelLastMessage(
                             serverRecord.server_url,
                             messageData.channel_id,
-                            messageData.message.created_at,
+                            messageData.created_at,
                         );
                     }
-
-                    // If we're not currently in this channel, it becomes unread
-                    // (The unread status will be calculated dynamically based on lastVisited vs lastMessageAt)
 
                     break;
                 }
