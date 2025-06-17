@@ -19,8 +19,8 @@ import {
 import { cn } from "@/utils/tailwind";
 import { UserPopover } from "./user-popup";
 import { useMembers } from "@/contexts/server-context";
-import { formatMessageDate } from "./message-channel";
 import { downloadFile } from "@/utils/assets";
+import { formatMessageDate } from "./message-channel/message-item";
 
 interface PinnedPopupProps {
     serverUrl: string;
