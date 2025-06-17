@@ -7,6 +7,7 @@ export interface ServerInfo {
     max_file_size: number;
     max_attachments: number;
     icon: string;
+    tenor_enabled: boolean;
 }
 
 export interface Channel {
@@ -991,4 +992,96 @@ export async function updateServerConfig(
             body: JSON.stringify(config),
         },
     );
+}
+
+// Tenor API Types
+export interface TenorMediaFormat {
+    url: string;
+    dims: [number, number];
+    duration?: number;
+    size?: number;
+}
+
+export interface TenorGifResult {
+    id: string;
+    title: string;
+    content_description: string;
+    created: number;
+    itemurl: string;
+    url: string;
+    tags: string[];
+    media_formats: Record<string, TenorMediaFormat>;
+    hasaudio: boolean;
+    hascaption: boolean;
+    flags: string[];
+    bg_color: string;
+}
+
+export interface TenorSearchResponse {
+    results: TenorGifResult[];
+    next: string;
+}
+
+export interface TenorTrendingResponse {
+    results: TenorGifResult[];
+    next: string;
+}
+
+export interface TenorCategoriesResponse {
+    categories: string[];
+}
+
+export async function tenorSearch(
+    serverUrl: string,
+    userId: string,
+    query: string,
+    options?: {
+        limit?: number;
+        locale?: string;
+        contentfilter?: string;
+        pos?: string;
+    },
+): Promise<TenorSearchResponse> {
+    const params = new URLSearchParams();
+    params.append("q", query);
+    if (options?.limit !== undefined)
+        params.append("limit", options.limit.toString());
+    if (options?.locale) params.append("locale", options.locale);
+    if (options?.contentfilter)
+        params.append("contentfilter", options.contentfilter);
+    if (options?.pos) params.append("pos", options.pos);
+
+    const endpoint = `/tenor/search?${params.toString()}`;
+    return apiRequest<TenorSearchResponse>(serverUrl, endpoint, userId, {
+        method: "GET",
+    });
+}
+
+export async function tenorTrending(
+    serverUrl: string,
+    userId: string,
+    options?: {
+        limit?: number;
+        pos?: string;
+    },
+): Promise<TenorTrendingResponse> {
+    const params = new URLSearchParams();
+    if (options?.limit !== undefined)
+        params.append("limit", options.limit.toString());
+    if (options?.pos) params.append("pos", options.pos);
+
+    const endpoint = `/tenor/trending?${params.toString()}`;
+    return apiRequest<TenorTrendingResponse>(serverUrl, endpoint, userId, {
+        method: "GET",
+    });
+}
+
+export async function tenorCategories(
+    serverUrl: string,
+    userId: string,
+): Promise<TenorCategoriesResponse> {
+    const endpoint = `/tenor/categories`;
+    return apiRequest<TenorCategoriesResponse>(serverUrl, endpoint, userId, {
+        method: "GET",
+    });
 }

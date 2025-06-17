@@ -133,6 +133,7 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                         current_users: meta.current_users || 0,
                         max_file_size: meta.max_file_size || 0,
                         max_attachments: meta.max_attachments || 0,
+                        tenor_enabled: meta.tenor_enabled || false,
                     };
                 }
             }
@@ -149,6 +150,7 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
             current_users: 0,
             max_file_size: 0,
             max_attachments: 0,
+            tenor_enabled: false,
         };
     }, [serverRecord, userId]);
 

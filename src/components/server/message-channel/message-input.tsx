@@ -9,11 +9,14 @@ import {
     X,
     Image as ImageIcon,
     FileText,
+    ImagePlay,
 } from "lucide-react";
 import { formatFileSize } from "@/api/server";
 import { EmojiPopup } from "../emoji-popup";
 import { ProcessedMessageContent } from "./message-content";
 import { MessageContentPart } from "./message-content-processor";
+import { useServer } from "@/contexts/server-context";
+import { GifPopup } from "./gif-popup";
 
 interface MessageInputProps {
     messageText: string;
@@ -27,13 +30,14 @@ interface MessageInputProps {
     onRemoveFile: (index: number) => void;
     onOpenFileDialog: () => void;
     onEmojiSelect: (emoji: string) => void;
+    onGifSelect: (gifUrl: string) => void;
     sending: boolean;
     canWrite: boolean;
     channelName: string;
     displayParts: MessageContentPart[];
     currentUserId?: string;
-    textareaRef: React.RefObject<HTMLTextAreaElement>;
-    fileInputRef: React.RefObject<HTMLInputElement>;
+    textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+    fileInputRef: React.RefObject<HTMLInputElement | null>;
 }
 
 export function MessageInput({
@@ -48,6 +52,7 @@ export function MessageInput({
     onRemoveFile,
     onOpenFileDialog,
     onEmojiSelect,
+    onGifSelect,
     sending,
     canWrite,
     channelName,
@@ -56,8 +61,11 @@ export function MessageInput({
     textareaRef,
     fileInputRef,
 }: MessageInputProps) {
+    const { serverInfo } = useServer();
     const getFileKey = (file: File) =>
         `${file.name}-${file.size}-${file.lastModified}`;
+
+    console.log(serverInfo);
 
     return (
         <div className={"min-h-16 content-center border-t px-3 py-2"}>
@@ -189,6 +197,19 @@ export function MessageInput({
                         data-scrollbar-custom
                     />
                 </div>
+
+                {serverInfo?.tenor_enabled && (
+                    <GifPopup onGifSelect={onGifSelect}>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-foreground"
+                            disabled={sending || !canWrite}
+                        >
+                            <ImagePlay size={20} />
+                        </Button>
+                    </GifPopup>
+                )}
 
                 <EmojiPopup onEmojiSelect={onEmojiSelect}>
                     <Button

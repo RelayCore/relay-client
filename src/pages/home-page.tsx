@@ -17,24 +17,13 @@ import {
 } from "@/storage/server-store";
 import { JoinServerDialog } from "@/components/server/join-server-dialog";
 import { webSocketManager } from "@/websocket/websocket-manager";
-import { leaveServer } from "@/api/server";
+import { leaveServer, getServerInfo, ServerInfo } from "@/api/server";
 import { toast } from "sonner";
 import { useConfirm } from "@/contexts/confirm-context";
 
-interface ServerMetadata {
-    name: string;
-    description: string;
-    allow_invite: boolean;
-    current_users: number;
-    max_users: number;
-    max_file_size: number;
-    max_attachments: number;
-    icon?: string;
-}
-
 interface ServerStatus {
     online: boolean;
-    metadata?: ServerMetadata;
+    metadata?: ServerInfo;
     lastChecked: number;
 }
 
@@ -160,27 +149,12 @@ export default function HomePage() {
     const fetchServerMetadata = useCallback(
         async (server: ServerRecord): Promise<ServerStatus> => {
             try {
-                const response = await fetch(`${server.server_url}/server`, {
-                    method: "GET",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    signal: AbortSignal.timeout(10000), // 10 second timeout
-                });
-
-                if (response.ok) {
-                    const metadata: ServerMetadata = await response.json();
-                    return {
-                        online: true,
-                        metadata,
-                        lastChecked: Date.now(),
-                    };
-                } else {
-                    return {
-                        online: false,
-                        lastChecked: Date.now(),
-                    };
-                }
+                const metadata = await getServerInfo(server.server_url);
+                return {
+                    online: true,
+                    metadata,
+                    lastChecked: Date.now(),
+                };
             } catch {
                 return {
                     online: false,

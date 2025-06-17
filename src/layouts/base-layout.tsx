@@ -35,21 +35,11 @@ import { loadServers, ServerRecord } from "@/storage/server-store";
 import { ServerProvider } from "@/contexts/server-context";
 import { webSocketManager } from "@/websocket/websocket-manager";
 import { JoinServerDialog } from "@/components/server/join-server-dialog";
-
-// Add interface for server metadata
-interface ServerMetadata {
-    name: string;
-    description: string;
-    allow_invite: boolean;
-    max_users: number;
-    max_file_size: number;
-    max_attachments: number;
-    icon?: string;
-}
+import { getServerInfo, ServerInfo } from "@/api/server";
 
 interface ServerStatus {
     online: boolean;
-    metadata?: ServerMetadata;
+    metadata?: ServerInfo;
     lastChecked: number;
 }
 
@@ -143,30 +133,12 @@ function BaseLayoutContent({
     const fetchServerMetadata = React.useCallback(
         async (server: ServerRecord): Promise<ServerStatus> => {
             try {
-                const response = await fetch(`${server.server_url}/server`, {
-                    method: "GET",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    signal: AbortSignal.timeout(10000), // 10 second timeout
-                });
-
-                if (response.ok) {
-                    const metadata: ServerMetadata = await response.json();
-                    return {
-                        online: true,
-                        metadata,
-                        lastChecked: Date.now(),
-                    };
-                } else {
-                    console.warn(
-                        `Server ${server.server_name || server.server_url} returned ${response.status}`,
-                    );
-                    return {
-                        online: false,
-                        lastChecked: Date.now(),
-                    };
-                }
+                const metadata = await getServerInfo(server.server_url);
+                return {
+                    online: true,
+                    metadata,
+                    lastChecked: Date.now(),
+                };
             } catch (error) {
                 console.warn(
                     `Failed to fetch metadata for ${server.server_name || server.server_url}:`,
