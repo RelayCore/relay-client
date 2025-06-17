@@ -8,14 +8,32 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ServerIcon, Plus, Users, LogOut, RefreshCw } from "lucide-react";
+import {
+    ServerIcon,
+    Plus,
+    Users,
+    LogOut,
+    RefreshCw,
+    Download,
+    Upload,
+    FileDown,
+    FileUp,
+} from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import {
     loadServers,
     ServerRecord,
     removeServer,
+    UserIdentity,
+    restoreIdentityToServer,
+    findExistingServersForIdentities,
+    getNewIdentities,
 } from "@/storage/server-store";
 import { JoinServerDialog } from "@/components/server/join-server-dialog";
+import { ExportIdentityDialog } from "@/components/identity/export-identity";
+import { ImportIdentityDialog } from "@/components/identity/import-identity";
+import { ImportConfirmationDialog } from "@/components/identity/import-identity-confirmation";
+import { ExportAllIdentitiesDialog } from "@/components/identity/export-all-identities";
 import { webSocketManager } from "@/websocket/websocket-manager";
 import { leaveServer, getServerInfo, ServerInfo } from "@/api/server";
 import { toast } from "sonner";
@@ -58,6 +76,21 @@ export default function HomePage() {
     const [leavingServers, setLeavingServers] = useState<Set<string>>(
         new Set(),
     );
+    const [exportDialogOpen, setExportDialogOpen] = useState(false);
+    const [exportAllDialogOpen, setExportAllDialogOpen] = useState(false);
+    const [importDialogOpen, setImportDialogOpen] = useState(false);
+    const [importConfirmationOpen, setImportConfirmationOpen] = useState(false);
+    const [pendingIdentities, setPendingIdentities] = useState<{
+        new: UserIdentity[];
+        existing: Map<string, ServerRecord[]>;
+    }>({
+        new: [],
+        existing: new Map(),
+    });
+    const [selectedServerForExport, setSelectedServerForExport] = useState<{
+        serverUrl: string;
+        userId: string;
+    } | null>(null);
     const navigate = useNavigate();
     const { confirm } = useConfirm();
 
@@ -361,6 +394,15 @@ export default function HomePage() {
         return `Retry in ${minutes}m`;
     };
 
+    // Handle exporting identity
+    const handleExportIdentity = useCallback((server: ServerRecord) => {
+        setSelectedServerForExport({
+            serverUrl: server.server_url,
+            userId: server.user_id,
+        });
+        setExportDialogOpen(true);
+    }, []);
+
     // Handle leaving a server
     const handleLeaveServer = useCallback(
         async (server: ServerRecord) => {
@@ -463,6 +505,123 @@ export default function HomePage() {
         [confirm, saveCachedRetries],
     );
 
+    // Handle importing identities
+    const handleImportIdentities = useCallback(
+        async (identities: UserIdentity[]) => {
+            try {
+                // Check for existing servers
+                const existingServers =
+                    await findExistingServersForIdentities(identities);
+                const newIdentities = await getNewIdentities(identities);
+
+                if (newIdentities.length === 0 && existingServers.size === 0) {
+                    toast.error("No new identities to import");
+                    return;
+                }
+
+                // Store pending identities and show confirmation dialog
+                setPendingIdentities({
+                    new: newIdentities,
+                    existing: existingServers,
+                });
+                setImportConfirmationOpen(true);
+
+                if (existingServers.size > 0) {
+                    toast.info(
+                        `${existingServers.size} identit${existingServers.size === 1 ? "y" : "ies"} already exist${existingServers.size === 1 ? "s" : ""}`,
+                    );
+                }
+            } catch (error) {
+                console.error("Failed to process imported identities:", error);
+                toast.error("Failed to process imported identities");
+            }
+        },
+        [],
+    );
+
+    // Handle confirming identity import with server assignments
+    const handleConfirmImport = useCallback(
+        async (serverAssignments: Map<string, string>) => {
+            const { new: newIdentities } = pendingIdentities;
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (const identity of newIdentities) {
+                const serverUrl = serverAssignments.get(identity.user_id);
+                if (!serverUrl) continue;
+
+                try {
+                    // Try to get server info for metadata
+                    let serverMetadata;
+                    try {
+                        const serverInfo = await getServerInfo(serverUrl);
+                        serverMetadata = {
+                            name: serverInfo.name,
+                            description: serverInfo.description,
+                            icon: serverInfo.icon,
+                            allowInvite: serverInfo.allow_invite,
+                            maxUsers: serverInfo.max_users,
+                        };
+                    } catch (infoError) {
+                        console.warn(
+                            `Could not fetch server info for ${serverUrl}:`,
+                            infoError,
+                        );
+                        // Continue without metadata
+                    }
+
+                    // Create server record and save it
+                    await restoreIdentityToServer(
+                        identity,
+                        serverUrl,
+                        serverMetadata,
+                    );
+
+                    successCount++;
+                } catch (error) {
+                    console.error(
+                        `Failed to restore identity ${identity.user_id}:`,
+                        error,
+                    );
+
+                    // If joining fails, still save the identity locally for manual connection later
+                    try {
+                        await restoreIdentityToServer(identity, serverUrl);
+                        toast.warning(
+                            `Identity saved but couldn't connect to server: ${serverUrl}`,
+                        );
+                        successCount++;
+                    } catch (saveError) {
+                        console.error(
+                            `Failed to save identity ${identity.user_id}:`,
+                            saveError,
+                        );
+                        errorCount++;
+                    }
+                }
+            }
+
+            // Reset pending identities
+            setPendingIdentities({ new: [], existing: new Map() });
+
+            // Show results
+            if (successCount > 0) {
+                toast.success(
+                    `Successfully imported ${successCount} identit${successCount === 1 ? "y" : "ies"}`,
+                );
+            }
+            if (errorCount > 0) {
+                toast.error(
+                    `Failed to import ${errorCount} identit${errorCount === 1 ? "y" : "ies"}`,
+                );
+            }
+
+            // Close confirmation dialog
+            setImportConfirmationOpen(false);
+        },
+        [pendingIdentities],
+    );
+
     // Manual retry function
     const handleRetryServer = useCallback(
         async (server: ServerRecord) => {
@@ -538,6 +697,30 @@ export default function HomePage() {
                                   }`}
                         </p>
                     </div>
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => setImportDialogOpen(true)}
+                        >
+                            <FileUp className="mr-2 h-4 w-4" />
+                            Import Identities
+                        </Button>
+                        {servers.length > 0 && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setExportAllDialogOpen(true)}
+                            >
+                                <FileDown className="mr-2 h-4 w-4" />
+                                Export All
+                            </Button>
+                        )}
+                        <JoinServerDialog>
+                            <Button>
+                                <Plus className="mr-2 h-4 w-4" />
+                                Join Server
+                            </Button>
+                        </JoinServerDialog>
+                    </div>
                 </div>
             </div>
 
@@ -551,14 +734,23 @@ export default function HomePage() {
                             </h3>
                             <p className="text-muted-foreground mb-4">
                                 Join your first server to start chatting with
-                                others.
+                                others, or import existing identities.
                             </p>
-                            <JoinServerDialog>
-                                <Button>
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Join Server
+                            <div className="flex justify-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setImportDialogOpen(true)}
+                                >
+                                    <Upload className="mr-2 h-4 w-4" />
+                                    Import Identities
                                 </Button>
-                            </JoinServerDialog>
+                                <JoinServerDialog>
+                                    <Button>
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Join Server
+                                    </Button>
+                                </JoinServerDialog>
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
@@ -675,16 +867,31 @@ export default function HomePage() {
                                             </div>
                                         </div>
                                         <div className="flex gap-1">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="hover:border-primary h-8 w-8 p-0 hover:border-1"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleExportIdentity(
+                                                        server,
+                                                    );
+                                                }}
+                                                title="Export Identity"
+                                            >
+                                                <Download className="h-4 w-4" />
+                                            </Button>
                                             {!online && (
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
                                                     className="h-8 w-8 p-0"
-                                                    onClick={() =>
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
                                                         handleRetryServer(
                                                             server,
-                                                        )
-                                                    }
+                                                        );
+                                                    }}
                                                     title="Retry Connection"
                                                 >
                                                     <RefreshCw className="h-4 w-4" />
@@ -730,6 +937,38 @@ export default function HomePage() {
                     })}
                 </div>
             )}
+
+            {/* Export Identity Dialog */}
+            {selectedServerForExport && (
+                <ExportIdentityDialog
+                    open={exportDialogOpen}
+                    onOpenChange={setExportDialogOpen}
+                    serverUrl={selectedServerForExport.serverUrl}
+                    userId={selectedServerForExport.userId}
+                />
+            )}
+
+            {/* Export All Identities Dialog */}
+            <ExportAllIdentitiesDialog
+                open={exportAllDialogOpen}
+                onOpenChange={setExportAllDialogOpen}
+            />
+
+            {/* Import Identities Dialog */}
+            <ImportIdentityDialog
+                open={importDialogOpen}
+                onOpenChange={setImportDialogOpen}
+                onIdentitiesImported={handleImportIdentities}
+            />
+
+            {/* Import Confirmation Dialog */}
+            <ImportConfirmationDialog
+                open={importConfirmationOpen}
+                onOpenChange={setImportConfirmationOpen}
+                newIdentities={pendingIdentities.new}
+                existingServers={pendingIdentities.existing}
+                onConfirm={handleConfirmImport}
+            />
         </div>
     );
 }
