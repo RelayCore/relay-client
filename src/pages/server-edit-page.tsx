@@ -12,7 +12,6 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ColorPicker } from "@/components/ui/color-picker";
@@ -25,7 +24,6 @@ import {
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
-    Upload,
     Settings,
     Save,
     UserPlus,
@@ -39,7 +37,6 @@ import {
 } from "lucide-react";
 import {
     ServerInfo,
-    uploadServerIcon,
     updateServerConfig,
     UpdateServerConfigRequest,
     getInvites,
@@ -58,6 +55,7 @@ import { useServer, useServerRecord } from "@/contexts/server-context";
 import { useNavigate } from "@tanstack/react-router";
 import ServerHeader from "@/components/server/server-header";
 import { useConfirm } from "@/contexts/confirm-context";
+import { ServerIconCropper } from "@/components/server-edit/server-icon";
 
 // Available permissions grouped by category
 const PERMISSION_GROUPS: {
@@ -392,28 +390,6 @@ export default function ServerEditPage() {
         toast.success("Invite code copied to clipboard");
     };
 
-    const handleIconUpload = async (
-        event: React.ChangeEvent<HTMLInputElement>,
-    ) => {
-        const file = event.target.files?.[0];
-        if (!file || !serverRecord) return;
-
-        try {
-            setSaving(true);
-            await uploadServerIcon(
-                serverRecord.server_url,
-                serverRecord.user_id,
-                file,
-            );
-            toast.success("Server icon updated successfully");
-            clearServerStatusCache();
-        } catch {
-            toast.error("Failed to upload server icon");
-        } finally {
-            setSaving(false);
-        }
-    };
-
     const saveServerConfig = async () => {
         if (!serverRecord) return;
 
@@ -703,189 +679,187 @@ export default function ServerEditPage() {
                         </div>
 
                         <TabsContent value="general">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Server Configuration</CardTitle>
-                                    <CardDescription>
-                                        Configure your server&apos;s basic
-                                        information and settings
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-6">
-                                    {/* Server Icon */}
-                                    <div className="flex items-center space-x-4">
-                                        <div className="relative">
-                                            <Avatar className="h-20 w-20 rounded-sm">
-                                                <AvatarImage
-                                                    src={serverInfo?.icon}
-                                                />
-                                                <AvatarFallback>
-                                                    {serverInfo?.name
-                                                        ?.substring(0, 2)
-                                                        .toUpperCase()}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <Label
-                                                htmlFor="icon-upload"
-                                                className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-sm bg-black/50 text-white opacity-0 transition-opacity hover:opacity-100"
-                                            >
-                                                <Upload className="h-5 w-5" />
-                                            </Label>
-                                            <Input
-                                                id="icon-upload"
-                                                type="file"
-                                                accept="image/*"
-                                                className="hidden"
-                                                onChange={handleIconUpload}
-                                                disabled={saving}
-                                            />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-medium">
-                                                Server Icon
-                                            </h3>
-                                            <p className="text-muted-foreground text-sm">
-                                                PNG, JPG, GIF up to 5MB
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Server Name and Max Users */}
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="name">
-                                                Server Name
-                                            </Label>
-                                            <Input
-                                                id="name"
-                                                value={formData.name || ""}
-                                                onChange={(e) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        name: e.target.value,
-                                                    })
-                                                }
-                                                placeholder="Enter server name"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="max-users">
-                                                Max Users
-                                            </Label>
-                                            <Input
-                                                id="max-users"
-                                                type="number"
-                                                min="1"
-                                                value={formData.max_users || ""}
-                                                onChange={(e) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        max_users: parseInt(
-                                                            e.target.value,
-                                                        ),
-                                                    })
-                                                }
-                                                placeholder="Maximum number of users"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Description */}
-                                    <div className="space-y-2">
-                                        <Label htmlFor="description">
-                                            Description
-                                        </Label>
-                                        <Textarea
-                                            id="description"
-                                            value={formData.description || ""}
-                                            onChange={(e) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    description: e.target.value,
-                                                })
-                                            }
-                                            placeholder="Describe your server"
-                                            rows={3}
+                            <div className="space-y-6">
+                                {/* Server Icon Card */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Server Icon</CardTitle>
+                                        <CardDescription>
+                                            Upload and crop your server&apos;s
+                                            icon
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <ServerIconCropper
+                                            currentIcon={serverInfo?.icon}
+                                            onIconUpdated={() => {
+                                                // Optionally refresh server data after icon update
+                                                refreshServerData();
+                                            }}
                                         />
-                                    </div>
+                                    </CardContent>
+                                </Card>
 
-                                    {/* File Settings */}
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="max-file-size">
-                                                Max File Size (MB)
-                                            </Label>
-                                            <Input
-                                                id="max-file-size"
-                                                type="number"
-                                                min="1"
-                                                value={
-                                                    formData.max_file_size || ""
-                                                }
-                                                onChange={(e) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        max_file_size: parseInt(
-                                                            e.target.value,
-                                                        ),
-                                                    })
-                                                }
-                                                placeholder="Maximum file size"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="max-attachments">
-                                                Max Attachments per Message
-                                            </Label>
-                                            <Input
-                                                id="max-attachments"
-                                                type="number"
-                                                min="1"
-                                                max="100"
-                                                value={
-                                                    formData.max_attachments ||
-                                                    ""
-                                                }
-                                                onChange={(e) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        max_attachments:
-                                                            parseInt(
+                                {/* Server Configuration Card */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>
+                                            Server Configuration
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Configure your server&apos;s basic
+                                            information and settings
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="space-y-6">
+                                        {/* Server Name and Max Users */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="name">
+                                                    Server Name
+                                                </Label>
+                                                <Input
+                                                    id="name"
+                                                    value={formData.name || ""}
+                                                    onChange={(e) =>
+                                                        setFormData({
+                                                            ...formData,
+                                                            name: e.target
+                                                                .value,
+                                                        })
+                                                    }
+                                                    placeholder="Enter server name"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="max-users">
+                                                    Max Users
+                                                </Label>
+                                                <Input
+                                                    id="max-users"
+                                                    type="number"
+                                                    min="1"
+                                                    value={
+                                                        formData.max_users || ""
+                                                    }
+                                                    onChange={(e) =>
+                                                        setFormData({
+                                                            ...formData,
+                                                            max_users: parseInt(
                                                                 e.target.value,
                                                             ),
+                                                        })
+                                                    }
+                                                    placeholder="Maximum number of users"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Description */}
+                                        <div className="space-y-2">
+                                            <Label htmlFor="description">
+                                                Description
+                                            </Label>
+                                            <Textarea
+                                                id="description"
+                                                value={
+                                                    formData.description || ""
+                                                }
+                                                onChange={(e) =>
+                                                    setFormData({
+                                                        ...formData,
+                                                        description:
+                                                            e.target.value,
                                                     })
                                                 }
-                                                placeholder="Maximum attachments"
+                                                placeholder="Describe your server"
+                                                rows={3}
                                             />
                                         </div>
-                                    </div>
 
-                                    {/* Allow Invites Toggle */}
-                                    <div className="flex items-center justify-between rounded-lg border p-4">
-                                        <div>
-                                            <Label htmlFor="allow-invite">
-                                                Allow Invites
-                                            </Label>
-                                            <p className="text-muted-foreground text-sm">
-                                                Allow members to create invite
-                                                links
-                                            </p>
+                                        {/* File Settings */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="max-file-size">
+                                                    Max File Size (MB)
+                                                </Label>
+                                                <Input
+                                                    id="max-file-size"
+                                                    type="number"
+                                                    min="1"
+                                                    value={
+                                                        formData.max_file_size ||
+                                                        ""
+                                                    }
+                                                    onChange={(e) =>
+                                                        setFormData({
+                                                            ...formData,
+                                                            max_file_size:
+                                                                parseInt(
+                                                                    e.target
+                                                                        .value,
+                                                                ),
+                                                        })
+                                                    }
+                                                    placeholder="Maximum file size"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="max-attachments">
+                                                    Max Attachments per Message
+                                                </Label>
+                                                <Input
+                                                    id="max-attachments"
+                                                    type="number"
+                                                    min="1"
+                                                    max="100"
+                                                    value={
+                                                        formData.max_attachments ||
+                                                        ""
+                                                    }
+                                                    onChange={(e) =>
+                                                        setFormData({
+                                                            ...formData,
+                                                            max_attachments:
+                                                                parseInt(
+                                                                    e.target
+                                                                        .value,
+                                                                ),
+                                                        })
+                                                    }
+                                                    placeholder="Maximum attachments"
+                                                />
+                                            </div>
                                         </div>
-                                        <Switch
-                                            id="allow-invite"
-                                            checked={
-                                                formData.allow_invite || false
-                                            }
-                                            onCheckedChange={(checked) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    allow_invite: checked,
-                                                })
-                                            }
-                                        />
-                                    </div>
-                                </CardContent>
-                            </Card>
+
+                                        {/* Allow Invites Toggle */}
+                                        <div className="flex items-center justify-between rounded-lg border p-4">
+                                            <div>
+                                                <Label htmlFor="allow-invite">
+                                                    Allow Invites
+                                                </Label>
+                                                <p className="text-muted-foreground text-sm">
+                                                    Allow members to create
+                                                    invite links
+                                                </p>
+                                            </div>
+                                            <Switch
+                                                id="allow-invite"
+                                                checked={
+                                                    formData.allow_invite ||
+                                                    false
+                                                }
+                                                onCheckedChange={(checked) =>
+                                                    setFormData({
+                                                        ...formData,
+                                                        allow_invite: checked,
+                                                    })
+                                                }
+                                            />
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
                         </TabsContent>
 
                         <TabsContent value="roles">
