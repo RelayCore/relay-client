@@ -14,6 +14,7 @@ import { isImageFile, isVideoFile } from "./utils/assets";
 import { handleImageRequest, handleVideoRequest } from "./files";
 import { cleanupFileWatchers } from "./helpers/ipc/file/file-listeners";
 import { webSocketManager } from "./websocket/websocket-manager";
+import { ogCache } from "./helpers/ipc/og/og-listeners";
 
 dotenv.config();
 
@@ -277,6 +278,13 @@ app.whenReady().then(async () => {
     }
     createMainWindow();
     installExtensions();
+
+    console.log("Running OG cache cleanup...");
+    await ogCache.cleanupExpiredCache();
+    const stats = await ogCache.getCacheStats();
+    console.log(
+        `OG cache stats: ${stats.totalFiles} files, ${(stats.totalSize / 1024).toFixed(2)} KB`,
+    );
 
     // If loading window is disabled, show main window immediately when it's ready
     if (!APP_CONFIG.useLoadingWindow) {

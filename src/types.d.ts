@@ -187,11 +187,24 @@ interface FileSystemContext {
     }>;
 }
 
+interface OGData {
+    title?: string;
+    description?: string;
+    imageUrl?: string;
+    siteName?: string;
+    url: string;
+}
+
+interface ogAPI {
+    fetchMeta: (url: string) => Promise<OGData>;
+}
+
 declare interface Window {
     themeMode: ThemeModeContext;
     electronWindow: ElectronWindow;
     loadingManager: LoadingManagerAPI;
     fileSystem: FileSystemContext;
+    ogAPI: ogAPI;
     appConfig: {
         name: string;
         protocolName: string;

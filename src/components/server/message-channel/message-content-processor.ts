@@ -8,6 +8,7 @@ export type MessageContentPart = {
         url?: string;
         tagName?: string;
         emojiCode?: string;
+        isImageLink?: boolean; // Added for image link detection
     };
 };
 
@@ -27,8 +28,7 @@ export class MessageContentProcessor {
 
         // Apply processors in order
         parts = this.processMentions(parts);
-        // Future processors can be added here:
-        // parts = this.processLinks(parts);
+        parts = this.processLinks(parts);
 
         return parts;
     }
@@ -101,42 +101,76 @@ export class MessageContentProcessor {
     }
 
     /**
-     * Future method for processing tags like #general
+     * Method for processing links
      */
-    private processTags(parts: MessageContentPart[]): MessageContentPart[] {
+    private processLinks(parts: MessageContentPart[]): MessageContentPart[] {
         const newParts: MessageContentPart[] = [];
 
         for (const part of parts) {
-            if (part.type !== "text") {
+            if (part.type !== "text" || !part.content) {
                 newParts.push(part);
                 continue;
             }
 
-            // Tag processing logic would go here
-            // For now, just pass through
-            newParts.push(part);
+            const linkParts = this.extractLinks(part.content);
+            newParts.push(...linkParts);
         }
 
         return newParts;
     }
 
     /**
-     * Future method for processing links
+     * Extract links from a text string
      */
-    private processLinks(parts: MessageContentPart[]): MessageContentPart[] {
-        const newParts: MessageContentPart[] = [];
+    private extractLinks(text: string): MessageContentPart[] {
+        const parts: MessageContentPart[] = [];
+        let lastIndex = 0;
 
-        for (const part of parts) {
-            if (part.type !== "text") {
-                newParts.push(part);
-                continue;
+        // Regex to find URLs (http, https, or www at the start of a word)
+        const urlRegex =
+            /(\bhttps?:\/\/[^\s/$.?#].[^\s]*|\bwww\.[^\s/$.?#].[^\s]*)/gi;
+        let match;
+
+        while ((match = urlRegex.exec(text)) !== null) {
+            const [fullMatch] = match;
+            const startIndex = match.index;
+
+            // Add text before link
+            if (startIndex > lastIndex) {
+                parts.push({
+                    type: "text",
+                    content: text.slice(lastIndex, startIndex),
+                });
             }
 
-            // Link processing logic would go here
-            // For now, just pass through
-            newParts.push(part);
+            // Add link part
+            let url = fullMatch;
+            if (url.toLowerCase().startsWith("www.")) {
+                url = "http://" + url;
+            }
+
+            // Check if the URL is an image link (case-insensitive, before query parameters)
+            const isImage = /\.(jpeg|jpg|gif|png|webp|bmp)$/i.test(
+                url.split("?")[0],
+            );
+
+            parts.push({
+                type: "link",
+                content: fullMatch, // Display the original matched string
+                data: { url: url, isImageLink: isImage }, // Set isImageLink
+            });
+
+            lastIndex = startIndex + fullMatch.length;
         }
 
-        return newParts;
+        // Add remaining text
+        if (lastIndex < text.length) {
+            parts.push({
+                type: "text",
+                content: text.slice(lastIndex),
+            });
+        }
+
+        return parts.length > 0 ? parts : [{ type: "text", content: text }];
     }
 }

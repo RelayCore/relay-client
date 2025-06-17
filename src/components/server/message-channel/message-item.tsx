@@ -6,7 +6,7 @@ import { useMembers } from "@/contexts/server-context";
 import { UserPopover } from "../user-popup";
 import { UserAvatar } from "../user-avatar";
 import { AttachmentItem } from "./attachment-item";
-import { ProcessedMessageContent } from "./message-content";
+import { ProcessedMessageContent, OGData } from "./message-content";
 import { MessageContentProcessor } from "./message-content-processor";
 
 export function formatMessageDate(timestamp: string): string {
@@ -82,6 +82,10 @@ export function MessageItem({
         Array.isArray(message.attachments) &&
         message.attachments.length > 0;
 
+    const [ogDataMap, setOgDataMap] = React.useState<
+        Record<string, OGData | "loading" | "error" | "nodata">
+    >({});
+
     const userId = message.author_id || "";
 
     // Find the real user from the members list
@@ -145,6 +149,72 @@ export function MessageItem({
         return processor.processContent(message.content);
     }, [message.content, users]);
 
+    // Effect to fetch OpenGraph data for links
+    React.useEffect(() => {
+        let isActive = true; // Flag to prevent state updates on unmounted component
+
+        const urlsToFetchDetails: { url: string; partContent: string }[] = [];
+        messageContentParts.forEach((part) => {
+            if (
+                part.type === "link" &&
+                part.data?.url &&
+                !part.data.isImageLink
+            ) {
+                if (
+                    !(part.data.url in ogDataMap) ||
+                    ogDataMap[part.data.url] === "error"
+                ) {
+                    // Fetch if not present or if previous attempt errored
+                    urlsToFetchDetails.push({
+                        url: part.data.url,
+                        partContent: part.content,
+                    });
+                }
+            }
+        });
+
+        if (urlsToFetchDetails.length > 0) {
+            if (isActive) {
+                setOgDataMap((prevMap) => {
+                    const newMap = { ...prevMap };
+                    urlsToFetchDetails.forEach(({ url }) => {
+                        newMap[url] = "loading";
+                    });
+                    return newMap;
+                });
+            }
+
+            urlsToFetchDetails.forEach(async ({ url, partContent }) => {
+                try {
+                    const meta = await window.ogAPI.fetchMeta(url);
+                    if (isActive) {
+                        setOgDataMap((prevMap) => ({
+                            ...prevMap,
+                            [url]: {
+                                title: meta.title || partContent,
+                                description: meta.description || "",
+                                imageUrl: meta.imageUrl || "",
+                                siteName: meta.title || "",
+                                url,
+                            },
+                        }));
+                    }
+                } catch (error) {
+                    console.error("Error fetching OG data for", url, error);
+                    if (isActive) {
+                        setOgDataMap((prevMap) => ({
+                            ...prevMap,
+                            [url]: "error",
+                        }));
+                    }
+                }
+            });
+        }
+        return () => {
+            isActive = false; // Cleanup function to set isActive to false when component unmounts or effect re-runs
+        };
+    }, [messageContentParts]); // Intentionally not including ogDataMap to prevent infinite loops
+
     const MessageContent = React.useMemo(() => {
         if (isEditing) {
             return (
@@ -193,6 +263,8 @@ export function MessageItem({
                 <ProcessedMessageContent
                     parts={messageContentParts}
                     currentUserId={currentUserId}
+                    ogDataMap={ogDataMap}
+                    onImageClick={onImageClick}
                 />
             </div>
         );
@@ -206,6 +278,7 @@ export function MessageItem({
         handleEditKeyDown,
         onEditSave,
         onEditCancel,
+        ogDataMap, // Add ogDataMap as a dependency
     ]);
 
     return (
