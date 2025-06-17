@@ -10,16 +10,19 @@ export function AttachmentItem({
     onImageClick,
 }: {
     attachment: Attachment;
-    onImageClick?: (attachment: Attachment) => void;
+    onImageClick?: (
+        attachment: Attachment,
+        sourceElement?: HTMLElement,
+    ) => void;
 }) {
     const isImage = attachment.type === "image";
     const isVideo = attachment.type === "video";
     const fileSize = formatFileSize(attachment.file_size);
 
     // Open attachment in a new tab
-    const handleOpen = () => {
+    const handleOpen = (e: React.MouseEvent) => {
         if (isImage && onImageClick) {
-            onImageClick(attachment);
+            onImageClick(attachment, e.currentTarget as HTMLElement);
         } else {
             window.open(attachment.file_path, "_blank");
         }

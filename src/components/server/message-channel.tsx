@@ -44,6 +44,7 @@ import { downloadFile } from "@/utils/assets";
 import { MessageItem } from "./message-channel/message-item";
 import { ProcessedMessageContent } from "./message-channel/message-content";
 import { MessageContentProcessor } from "./message-channel/message-content-processor";
+import { motion, AnimatePresence } from "framer-motion";
 
 export interface MessageChannelProps {
     channelId: number;
@@ -73,6 +74,8 @@ export default function MessageChannel({
     const [openedImage, setOpenedImage] = React.useState<Attachment | null>(
         null,
     );
+    const [sourceImageRect, setSourceImageRect] =
+        React.useState<DOMRect | null>(null);
     const [currentChannel, setCurrentChannel] = React.useState<Channel | null>(
         null,
     );
@@ -81,7 +84,6 @@ export default function MessageChannel({
     >(null);
     const [editingText, setEditingText] = React.useState("");
 
-    // Mention popup state
     const [mentionPopupOpen, setMentionPopupOpen] = React.useState(false);
     const [mentionSearchQuery, setMentionSearchQuery] = React.useState("");
     const [mentionSelectedIndex, setMentionSelectedIndex] = React.useState(0);
@@ -668,11 +670,30 @@ export default function MessageChannel({
         };
     }, [filePreviewUrls]);
 
+    const handleImageClick = React.useCallback(
+        (attachment: Attachment, sourceElement?: HTMLElement) => {
+            if (sourceElement) {
+                const rect = sourceElement.getBoundingClientRect();
+                setSourceImageRect(rect);
+            } else {
+                setSourceImageRect(null); // Ensure reset if no source element
+            }
+            setOpenedImage(attachment);
+        },
+        [],
+    );
+
+    const handleCloseImageModal = React.useCallback(() => {
+        // sourceImageRect is kept for the exit animation.
+        // It will be cleared on the next open if no sourceElement, or overwritten.
+        setOpenedImage(null);
+    }, []);
+
     // Close image modal on Escape key
     React.useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === "Escape" && openedImage) {
-                setOpenedImage(null);
+                handleCloseImageModal();
             }
         };
 
@@ -685,7 +706,7 @@ export default function MessageChannel({
             document.removeEventListener("keydown", handleKeyDown);
             document.body.style.overflow = "unset";
         };
-    }, [openedImage]);
+    }, [openedImage, handleCloseImageModal]);
 
     // Get current channel data using getSelectedChannel instead of fetching all channels
     React.useEffect(() => {
@@ -878,69 +899,125 @@ export default function MessageChannel({
                 </div>
             )}
 
-            {/* Image Modal */}
-            {openedImage && (
-                <div
-                    className="fixed inset-0 z-50 flex flex-col bg-black/80"
-                    onClick={() => setOpenedImage(null)}
-                >
-                    {/* Controls at the top */}
-                    <div className="flex items-center justify-between p-4 text-white">
-                        <div className="max-w-md truncate text-sm">
-                            {openedImage.file_name} (
-                            {formatFileSize(openedImage.file_size)})
-                        </div>
-                        <div className="flex flex-shrink-0 gap-2">
-                            <Button
-                                size="icon"
-                                variant="secondary"
-                                className="h-8 w-8"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    downloadFile(
-                                        openedImage.file_path,
-                                        openedImage.file_name,
-                                    );
-                                }}
-                            >
-                                <Download size={16} />
-                            </Button>
-                            <Button
-                                size="icon"
-                                variant="secondary"
-                                className="h-8 w-8"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    window.open(
-                                        openedImage.file_path,
-                                        "_blank",
-                                    );
-                                }}
-                            >
-                                <ExternalLink size={16} />
-                            </Button>
-                            <Button
-                                size="icon"
-                                variant="secondary"
-                                className="h-8 w-8"
-                                onClick={() => setOpenedImage(null)}
-                            >
-                                <X size={16} />
-                            </Button>
-                        </div>
-                    </div>
+            {/* Image Modal with Framer Motion */}
+            <AnimatePresence>
+                {openedImage && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="fixed inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-sm"
+                        onClick={handleCloseImageModal}
+                    >
+                        {/* Controls at the top */}
+                        <motion.div
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.2, delay: 0.1 }}
+                            className="flex items-center justify-between p-4 text-white"
+                        >
+                            <div className="max-w-md truncate text-sm">
+                                {openedImage.file_name} (
+                                {formatFileSize(openedImage.file_size)})
+                            </div>
+                            <div className="flex flex-shrink-0 gap-2">
+                                <Button
+                                    size="icon"
+                                    variant="secondary"
+                                    className="h-8 w-8"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        downloadFile(
+                                            openedImage.file_path,
+                                            openedImage.file_name,
+                                        );
+                                    }}
+                                >
+                                    <Download size={16} />
+                                </Button>
+                                <Button
+                                    size="icon"
+                                    variant="secondary"
+                                    className="h-8 w-8"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        window.open(
+                                            openedImage.file_path,
+                                            "_blank",
+                                        );
+                                    }}
+                                >
+                                    <ExternalLink size={16} />
+                                </Button>
+                                <Button
+                                    size="icon"
+                                    variant="secondary"
+                                    className="h-8 w-8"
+                                    onClick={handleCloseImageModal}
+                                >
+                                    <X size={16} />
+                                </Button>
+                            </div>
+                        </motion.div>
 
-                    {/* Image container */}
-                    <div className="flex flex-1 items-center justify-center p-4">
-                        <img
-                            src={openedImage.file_path}
-                            alt={openedImage.file_name}
-                            className="max-h-full max-w-full object-contain"
-                            onClick={(e) => e.stopPropagation()}
-                        />
-                    </div>
-                </div>
-            )}
+                        {/* Image container with animation from source */}
+                        <div className="flex flex-1 items-center justify-center p-4">
+                            <motion.img
+                                key={openedImage.id}
+                                src={openedImage.file_path}
+                                alt={openedImage.file_name}
+                                className="max-h-full max-w-full object-contain"
+                                onClick={(e) => e.stopPropagation()}
+                                initial={
+                                    sourceImageRect
+                                        ? {
+                                              x:
+                                                  sourceImageRect.left +
+                                                  sourceImageRect.width / 2 -
+                                                  window.innerWidth / 2,
+                                              y:
+                                                  sourceImageRect.top +
+                                                  sourceImageRect.height / 2 -
+                                                  window.innerHeight / 2,
+                                              scale: Math.min(
+                                                  sourceImageRect.width / 400,
+                                                  sourceImageRect.height / 400,
+                                              ),
+                                              opacity: 1,
+                                          }
+                                        : { scale: 0.8, opacity: 0 } // Fallback initial
+                                }
+                                animate={{ x: 0, y: 0, scale: 1, opacity: 1 }}
+                                exit={
+                                    sourceImageRect
+                                        ? {
+                                              x:
+                                                  sourceImageRect.left +
+                                                  sourceImageRect.width / 2 -
+                                                  window.innerWidth / 2,
+                                              y:
+                                                  sourceImageRect.top +
+                                                  sourceImageRect.height / 2 -
+                                                  window.innerHeight / 2,
+                                              scale: Math.min(
+                                                  sourceImageRect.width / 400,
+                                                  sourceImageRect.height / 400,
+                                              ),
+                                              opacity: 1,
+                                          }
+                                        : { scale: 0.8, opacity: 0 } // Fallback exit
+                                }
+                                transition={{
+                                    duration: 0.3,
+                                    ease: [0.4, 0, 0.2, 1],
+                                }}
+                            />
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             <div
                 ref={messagesContainerRef}
@@ -975,7 +1052,7 @@ export default function MessageChannel({
                                     message={message}
                                     showHeader={showHeader}
                                     currentUserId={currentUserId}
-                                    onImageClick={setOpenedImage}
+                                    onImageClick={handleImageClick}
                                     isEditing={editingMessageId === message.id}
                                     editingText={editingText}
                                     onEditingTextChange={setEditingText}

@@ -25,7 +25,10 @@ export function ProcessedMessageContent({
     parts: MessageContentPart[];
     currentUserId?: string;
     ogDataMap?: Record<string, OGData | "loading" | "error" | "nodata">;
-    onImageClick?: (attachment: Attachment) => void;
+    onImageClick?: (
+        attachment: Attachment,
+        sourceElement?: HTMLElement,
+    ) => void;
 }) {
     return (
         <>
@@ -167,7 +170,10 @@ function ImageLinkAttachment({
 }: {
     content: string;
     url: string;
-    onImageClick?: (attachment: Attachment) => void;
+    onImageClick?: (
+        attachment: Attachment,
+        sourceElement?: HTMLElement,
+    ) => void;
 }) {
     // Create a mock attachment object for the image link
     const mockAttachment: Attachment = {
@@ -203,7 +209,10 @@ function OpenGraphPreviewSpan({
 }: {
     ogData: OGData;
     originalUrlText: string;
-    onImageClick?: (attachment: Attachment) => void;
+    onImageClick?: (
+        attachment: Attachment,
+        sourceElement?: HTMLElement,
+    ) => void;
 }) {
     const { title, description, imageUrl, siteName, url: ogUrl } = ogData;
 
@@ -226,7 +235,7 @@ function OpenGraphPreviewSpan({
                 updated_at: "",
             };
 
-            onImageClick(mockAttachment);
+            onImageClick(mockAttachment, e.currentTarget as HTMLElement);
         }
     };
 

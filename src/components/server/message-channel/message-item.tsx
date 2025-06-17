@@ -68,7 +68,10 @@ export function MessageItem({
     message: Message;
     showHeader?: boolean;
     currentUserId?: string;
-    onImageClick?: (attachment: Attachment) => void;
+    onImageClick?: (
+        attachment: Attachment,
+        sourceElement?: HTMLElement,
+    ) => void;
     isEditing?: boolean;
     editingText?: string;
     onEditingTextChange?: (text: string) => void;
