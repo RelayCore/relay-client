@@ -426,7 +426,7 @@ export default function MessageChannel({
         (e: React.DragEvent<HTMLDivElement>) => {
             e.preventDefault();
             e.stopPropagation();
-            // Check if the mouse is leaving the dropZoneRef element entirely
+            // Only hide dragging if we're leaving the main drop zone container
             if (
                 dropZoneRef.current &&
                 !dropZoneRef.current.contains(e.relatedTarget as Node)
@@ -441,11 +441,12 @@ export default function MessageChannel({
         (e: React.DragEvent<HTMLDivElement>) => {
             e.preventDefault();
             e.stopPropagation();
-            if (e.dataTransfer.types.includes("Files") && !isDragging) {
+            // Always set dragging to true when files are being dragged over
+            if (e.dataTransfer.types.includes("Files")) {
                 setIsDragging(true);
             }
         },
-        [isDragging],
+        [],
     );
 
     const handleDrop = React.useCallback(
@@ -631,13 +632,30 @@ export default function MessageChannel({
             className={cn(
                 "relative flex h-full flex-col transition-colors",
                 className,
-                isDragging && "border-primary/30",
+                isDragging && "bg-accent/5",
             )}
             onDragEnter={handleDragEnter}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
         >
+            {/* Drag Overlay */}
+            {isDragging && (
+                <div className="border-primary bg-accent/80 pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center rounded-md border-2 border-dashed p-4 text-center backdrop-blur-sm">
+                    <Paperclip size={48} className="text-primary mb-4" />
+                    <p className="text-primary mb-2 text-lg font-semibold">
+                        Drop files here to attach
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                        Up to {serverInfo?.max_attachments ?? 10} files,{" "}
+                        {formatFileSize(
+                            serverInfo?.max_file_size ?? 50 * 1024 * 1024,
+                        )}{" "}
+                        each
+                    </p>
+                </div>
+            )}
+
             {/* Image Modal */}
             {openedImage && (
                 <div
