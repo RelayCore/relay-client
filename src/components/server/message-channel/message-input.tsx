@@ -68,7 +68,11 @@ export function MessageInput({
     console.log(serverInfo);
 
     return (
-        <div className={"min-h-16 content-center border-t px-3 py-2"}>
+        <div
+            className={
+                "min-h-16 flex-shrink-0 content-center border-t px-3 py-2"
+            }
+        >
             {/* File Attachments Preview */}
             {selectedFiles.length > 0 && (
                 <div className="mb-3 flex flex-wrap gap-2">
@@ -165,7 +169,7 @@ export function MessageInput({
                     {messageText && (
                         <div
                             className={cn(
-                                "pointer-events-none absolute inset-0 z-10 max-h-96 min-h-[40px] overflow-y-auto text-base md:text-sm",
+                                "pointer-events-none absolute inset-0 z-10 max-h-[200px] min-h-[40px] overflow-y-auto text-base md:text-sm",
                                 "px-[0.8rem] py-[0.55rem]",
                             )}
                         >
@@ -192,7 +196,7 @@ export function MessageInput({
                         onKeyDown={onKeyDown}
                         onBlur={onTextareaBlur}
                         className={cn(
-                            "max-h-96 min-h-[40px] flex-grow resize-none overflow-y-auto",
+                            "max-h-[200px] min-h-[40px] flex-grow resize-none overflow-y-auto",
                             messageText &&
                                 "text-transparent caret-black dark:caret-white",
                         )}

@@ -1051,7 +1051,7 @@ export default function MessageChannel({
 
             <div
                 ref={messagesContainerRef}
-                className="flex-grow overflow-auto px-3 py-3"
+                className="min-h-0 flex-grow overflow-auto px-3 py-3"
             >
                 {messages.length === 0 ? (
                     <div className="text-muted-foreground py-36 text-center">
