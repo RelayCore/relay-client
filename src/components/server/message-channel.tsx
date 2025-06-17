@@ -44,6 +44,35 @@ export interface MessageChannelProps {
     className?: string;
 }
 
+const isSameDay = (date1: Date, date2: Date): boolean => {
+    return (
+        date1.getFullYear() === date2.getFullYear() &&
+        date1.getMonth() === date2.getMonth() &&
+        date1.getDate() === date2.getDate()
+    );
+};
+
+const formatDateSeparator = (date: Date): string => {
+    return date.toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+    });
+};
+
+function DateSeparator({ date }: { date: Date }) {
+    return (
+        <div className="flex items-center py-4">
+            <div className="border-border flex-1 border-t"></div>
+            <div className="bg-muted text-muted-foreground mx-4 rounded-full px-3 py-1 text-xs font-medium">
+                {formatDateSeparator(date)}
+            </div>
+            <div className="border-border flex-1 border-t"></div>
+        </div>
+    );
+}
+
 export default function MessageChannel({
     channelId,
     channelName = "general",
@@ -1121,6 +1150,17 @@ export default function MessageChannel({
                                     ).getTime() >
                                     5 * 60 * 1000;
 
+                            // Check if we need to show a date separator
+                            const currentMessageDate = new Date(
+                                message.created_at,
+                            );
+                            const prevMessageDate = prevMessage
+                                ? new Date(prevMessage.created_at)
+                                : null;
+                            const showDateSeparator =
+                                !prevMessageDate ||
+                                !isSameDay(currentMessageDate, prevMessageDate);
+
                             const messageElement = (
                                 <MessageItem
                                     message={message}
@@ -1136,24 +1176,38 @@ export default function MessageChannel({
                                 />
                             );
 
-                            return canShowContextMenu ? (
-                                <MessageContextMenu
-                                    key={message.id}
-                                    message={message}
-                                    serverUrl={serverUrl}
-                                    currentUserId={currentUserId}
-                                    currentUser={currentUser}
-                                    channel={currentChannel}
-                                    isPinned={message.pinned || false}
-                                    onMessageDeleted={handleMessageDeleted}
-                                    onMessagePinned={handleMessagePinned}
-                                    onMessageUnpinned={handleMessageUnpinned}
-                                    onMessageEdit={handleMessageEdit}
-                                >
-                                    {messageElement}
-                                </MessageContextMenu>
-                            ) : (
-                                <div key={message.id}>{messageElement}</div>
+                            return (
+                                <React.Fragment key={message.id}>
+                                    {showDateSeparator && (
+                                        <DateSeparator
+                                            date={currentMessageDate}
+                                        />
+                                    )}
+                                    {canShowContextMenu ? (
+                                        <MessageContextMenu
+                                            message={message}
+                                            serverUrl={serverUrl}
+                                            currentUserId={currentUserId}
+                                            currentUser={currentUser}
+                                            channel={currentChannel}
+                                            isPinned={message.pinned || false}
+                                            onMessageDeleted={
+                                                handleMessageDeleted
+                                            }
+                                            onMessagePinned={
+                                                handleMessagePinned
+                                            }
+                                            onMessageUnpinned={
+                                                handleMessageUnpinned
+                                            }
+                                            onMessageEdit={handleMessageEdit}
+                                        >
+                                            {messageElement}
+                                        </MessageContextMenu>
+                                    ) : (
+                                        messageElement
+                                    )}
+                                </React.Fragment>
                             );
                         })}
                     </div>
