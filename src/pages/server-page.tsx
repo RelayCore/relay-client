@@ -12,6 +12,7 @@ import ServerHeader from "@/components/server/server-header";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
 import { useServer } from "@/contexts/server-context";
+import { markChannelAsRead, setChannelInfo } from "@/utils/server-localstorage";
 
 interface PanelSizes {
     channels: number;
@@ -68,8 +69,20 @@ export default function ServerPage() {
     const handleSelectChannel = React.useCallback(
         (channelId: number) => {
             setSelectedChannelId(channelId);
+
+            // Update localStorage with channel visit info and mark as read
+            if (serverRecord?.server_url) {
+                const now = new Date().toISOString();
+                setChannelInfo(serverRecord.server_url, channelId, {
+                    id: channelId,
+                    lastVisited: now,
+                });
+
+                // Mark the channel as read
+                markChannelAsRead(serverRecord.server_url, channelId);
+            }
         },
-        [setSelectedChannelId],
+        [setSelectedChannelId, serverRecord?.server_url],
     );
 
     const getSelectedChannelName = React.useCallback(() => {

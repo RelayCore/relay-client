@@ -78,12 +78,12 @@ export default function ChannelList({
     const { userId } = useParams({ strict: false });
     const { currentUser } = useCurrentUser();
     const {
-        users,
         channelGroups,
         selectedChannelId,
         selectedVoiceChannelId,
         setSelectedVoiceChannelId,
         refreshServerData,
+        isChannelUnread,
     } = useServer();
     const serverRecord = useServerRecord();
 
@@ -96,11 +96,6 @@ export default function ChannelList({
     const [voiceChannelStates, setVoiceChannelStates] = React.useState<
         Map<number, VoiceChannelState>
     >(new Map());
-
-    // Derive online users from the users in context
-    const onlineUsers = React.useMemo(() => {
-        return users.filter((user) => user.is_online).map((user) => user.id);
-    }, [users]);
 
     React.useEffect(() => {
         if (channelGroups.length > 0) {
@@ -406,7 +401,14 @@ export default function ChannelList({
                                                             : channel.id ===
                                                               selectedChannelId
                                                     }
-                                                    onlineUsers={onlineUsers}
+                                                    isUnread={
+                                                        !channel.is_voice &&
+                                                        channel.id !==
+                                                            selectedChannelId &&
+                                                        isChannelUnread(
+                                                            channel.id,
+                                                        )
+                                                    }
                                                     voiceState={voiceChannelStates.get(
                                                         channel.id,
                                                     )}
@@ -584,7 +586,7 @@ function ChannelDropZone({
 interface DraggableChannelProps {
     channel: Channel;
     isSelected: boolean;
-    onlineUsers?: string[];
+    isUnread?: boolean;
     voiceState?: VoiceChannelState;
     onClick: () => void;
     onEditChannel: (channel: Channel) => void;
@@ -601,7 +603,7 @@ interface DraggableChannelProps {
 function DraggableChannel({
     channel,
     isSelected,
-    onlineUsers = [],
+    isUnread = false,
     voiceState,
     onClick,
     onEditChannel,
@@ -689,7 +691,9 @@ function DraggableChannel({
                         "group relative mb-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1 text-sm",
                         isSelected
                             ? "bg-accent text-accent-foreground"
-                            : "text-muted-foreground hover:bg-accent/30 hover:text-foreground",
+                            : isUnread
+                              ? "text-foreground font-medium"
+                              : "text-muted-foreground hover:bg-accent/30 hover:text-foreground",
                     )}
                     onClick={onClick}
                 >
@@ -702,7 +706,10 @@ function DraggableChannel({
                                 )}
                             />
                         ) : (
-                            <Hash size={18} />
+                            <Hash
+                                size={18}
+                                className={cn(isUnread && "text-foreground")}
+                            />
                         )}
 
                         <span className="truncate">{channel.name}</span>
@@ -716,11 +723,10 @@ function DraggableChannel({
                             </span>
                         </div>
                     )}
-                    {!isVoiceChannel &&
-                        onlineUsers.length > 0 &&
-                        !isSelected && (
-                            <div className="ml-auto h-1.5 w-1.5 rounded-full bg-blue-500" />
-                        )}
+
+                    {!isVoiceChannel && isUnread && (
+                        <div className="bg-accent-positive ml-auto h-2 w-2 rounded-full" />
+                    )}
                 </button>
             </ChannelContextMenu>
 

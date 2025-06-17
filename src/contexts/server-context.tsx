@@ -9,6 +9,7 @@ import {
     getRoles,
     Channel,
     leaveServer as apiLeaveServer,
+    Message,
 } from "@/api/server";
 import {
     getServerById,
@@ -36,6 +37,10 @@ import {
     ServerConfigUpdatedBroadcast,
 } from "@/websocket/websocket-manager";
 import { toast } from "sonner";
+import {
+    isChannelUnread,
+    updateChannelLastMessage,
+} from "@/utils/server-localstorage";
 
 interface ServerContextState {
     // Server data
@@ -65,6 +70,7 @@ interface ServerContextState {
     getSelectedChannel: () => Channel | null;
     getSelectedVoiceChannel: () => Channel | null;
     getUserById: (userId: string) => User | null;
+    isChannelUnread: (channelId: number) => boolean;
 }
 
 const ServerContext = React.createContext<ServerContextState | null>(null);
@@ -276,6 +282,33 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         [userId],
     );
 
+    const isChannelUnreadHelper = React.useCallback(
+        (channelId: number) => {
+            if (!serverRecord?.server_url) return false;
+
+            // Find the channel to get its last_message_at
+            let channel: Channel | null = null;
+            for (const group of channelGroups) {
+                const foundChannel = group.channels.find(
+                    (c) => c.id === channelId,
+                );
+                if (foundChannel) {
+                    channel = foundChannel;
+                    break;
+                }
+            }
+
+            if (!channel || !channel.last_message_at) return false;
+
+            return isChannelUnread(
+                serverRecord.server_url,
+                channelId,
+                channel.last_message_at,
+            );
+        },
+        [serverRecord?.server_url, channelGroups],
+    );
+
     // Add WebSocket message handler for user status updates and channel updates
     React.useEffect(() => {
         if (!userId) return;
@@ -309,6 +342,43 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                             ),
                         })),
                     );
+                    break;
+                }
+
+                case MESSAGE_TYPES.MESSAGE_BROADCAST: {
+                    const messageData = message.data as {
+                        channel_id: number;
+                        message: Message;
+                    };
+
+                    // Update the channel's last_message_at timestamp
+                    setChannelGroups((prevGroups) =>
+                        prevGroups.map((group) => ({
+                            ...group,
+                            channels: group.channels.map((channel) =>
+                                channel.id === messageData.channel_id
+                                    ? {
+                                          ...channel,
+                                          last_message_at:
+                                              messageData.message.created_at,
+                                      }
+                                    : channel,
+                            ),
+                        })),
+                    );
+
+                    // Update localStorage with the new message timestamp
+                    if (serverRecord?.server_url) {
+                        updateChannelLastMessage(
+                            serverRecord.server_url,
+                            messageData.channel_id,
+                            messageData.message.created_at,
+                        );
+                    }
+
+                    // If we're not currently in this channel, it becomes unread
+                    // (The unread status will be calculated dynamically based on lastVisited vs lastMessageAt)
+
                     break;
                 }
 
@@ -723,6 +793,7 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         getSelectedChannel,
         getSelectedVoiceChannel,
         getUserById,
+        isChannelUnread: isChannelUnreadHelper,
     };
 
     return (

@@ -20,6 +20,7 @@ export interface Channel {
     type?: string;
     permissions?: ChannelPermission[];
     participants: VoiceParticipant[] | null;
+    last_message_at?: string;
 }
 
 export interface ChannelGroup {
