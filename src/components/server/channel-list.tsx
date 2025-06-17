@@ -31,10 +31,9 @@ import { VoiceEventData } from "@/api/voice";
 import {
     webSocketManager,
     WebSocketMessage,
-    OnlineUsersData,
     MESSAGE_TYPES,
 } from "@/websocket/websocket-manager";
-import { useChannels, useServerRecord } from "@/contexts/server-context";
+import { useServer, useServerRecord } from "@/contexts/server-context";
 import { useParams } from "@tanstack/react-router";
 import CreateChannelDialog from "./create-channel-dialog";
 import { ChannelContextMenu } from "./channel-context-menu";
@@ -79,24 +78,29 @@ export default function ChannelList({
     const { userId } = useParams({ strict: false });
     const { currentUser } = useCurrentUser();
     const {
+        users,
         channelGroups,
         selectedChannelId,
         selectedVoiceChannelId,
         setSelectedVoiceChannelId,
         refreshServerData,
-    } = useChannels();
+    } = useServer();
     const serverRecord = useServerRecord();
 
     const [expandedGroups, setExpandedGroups] = React.useState<ExpandedGroup[]>(
         [],
     );
-    const [onlineUsers, setOnlineUsers] = React.useState<string[]>([]);
     const [createChannelOpen, setCreateChannelOpen] = React.useState(false);
     const [editChannel, setEditChannel] = React.useState<Channel | null>(null);
     const [editChannelOpen, setEditChannelOpen] = React.useState(false);
     const [voiceChannelStates, setVoiceChannelStates] = React.useState<
         Map<number, VoiceChannelState>
     >(new Map());
+
+    // Derive online users from the users in context
+    const onlineUsers = React.useMemo(() => {
+        return users.filter((user) => user.is_online).map((user) => user.id);
+    }, [users]);
 
     React.useEffect(() => {
         if (channelGroups.length > 0) {
@@ -149,11 +153,6 @@ export default function ChannelList({
         const handleWebSocketMessage = (message: WebSocketMessage) => {
             console.log("ChannelList received WebSocket message:", message);
             switch (message.type) {
-                case MESSAGE_TYPES.ONLINE_USERS: {
-                    const onlineUsersData = message.data as OnlineUsersData;
-                    setOnlineUsers(onlineUsersData.online_users);
-                    break;
-                }
                 case MESSAGE_TYPES.USER_JOINED_VOICE: {
                     const data =
                         message.data as VoiceEventData["user_joined_voice"];

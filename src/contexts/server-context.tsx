@@ -22,6 +22,18 @@ import {
     webSocketManager,
     WebSocketMessage,
     ChannelUpdateBroadcast,
+    RoleCreatedBroadcast,
+    ChannelDeletedBroadcast,
+    ChannelCreatedBroadcast,
+    GroupCreatedBroadcast,
+    RoleDeletedBroadcast,
+    RoleAssignedBroadcast,
+    RoleRemovedBroadcast,
+    UserUpdatedBroadcast,
+    UserProfileUpdatedBroadcast,
+    UserLeftBroadcast,
+    ServerIconUpdatedBroadcast,
+    ServerConfigUpdatedBroadcast,
 } from "@/websocket/websocket-manager";
 import { toast } from "sonner";
 
@@ -239,6 +251,31 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         [users],
     );
 
+    const updateServerStatusCache = React.useCallback(
+        (updates: Partial<ServerInfo>) => {
+            if (!userId) return;
+
+            try {
+                const cached = localStorage.getItem("server-status-cache");
+                const parsedCache = cached ? JSON.parse(cached) : {};
+
+                if (!parsedCache[userId]) {
+                    parsedCache[userId] = { metadata: {} };
+                }
+
+                Object.assign(parsedCache[userId].metadata, updates);
+
+                localStorage.setItem(
+                    "server-status-cache",
+                    JSON.stringify(parsedCache),
+                );
+            } catch (error) {
+                console.warn("Failed to update server status cache:", error);
+            }
+        },
+        [userId],
+    );
+
     // Add WebSocket message handler for user status updates and channel updates
     React.useEffect(() => {
         if (!userId) return;
@@ -260,6 +297,7 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                     );
                     break;
                 }
+
                 case MESSAGE_TYPES.ONLINE_USERS: {
                     const onlineData = message.data as OnlineUsersData;
                     // Update all users' online status based on the list
@@ -273,6 +311,80 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                     );
                     break;
                 }
+
+                case MESSAGE_TYPES.GROUP_CREATED: {
+                    const groupData = message.data as GroupCreatedBroadcast;
+                    setChannelGroups((prevGroups) => [
+                        ...prevGroups,
+                        {
+                            id: groupData.id,
+                            name: groupData.name,
+                            channels: [],
+                        },
+                    ]);
+                    toast.success(`New group "${groupData.name}" created`);
+                    break;
+                }
+
+                case MESSAGE_TYPES.CHANNEL_CREATED: {
+                    const channelData = message.data as ChannelCreatedBroadcast;
+                    setChannelGroups((prevGroups) =>
+                        prevGroups.map((group) => {
+                            if (group.id === channelData.group_id) {
+                                const newChannel: Channel = {
+                                    id: channelData.id,
+                                    name: channelData.name,
+                                    description: channelData.description,
+                                    group_id: channelData.group_id,
+                                    group_name: channelData.group_name,
+                                    position: channelData.position,
+                                    type: channelData.type,
+                                    is_voice: channelData.is_voice,
+                                    permissions: [],
+                                    participants: [],
+                                };
+
+                                // Insert channel in correct position
+                                const updatedChannels = [
+                                    ...group.channels,
+                                    newChannel,
+                                ];
+                                updatedChannels.sort(
+                                    (a, b) => a.position - b.position,
+                                );
+
+                                return { ...group, channels: updatedChannels };
+                            }
+                            return group;
+                        }),
+                    );
+                    toast.success(`New channel "${channelData.name}" created`);
+                    break;
+                }
+
+                case MESSAGE_TYPES.CHANNEL_DELETED: {
+                    const deleteData = message.data as ChannelDeletedBroadcast;
+                    // Clear selection if deleted channel was selected
+                    if (selectedChannelId === deleteData.channel_id) {
+                        setSelectedChannelId(null);
+                    }
+                    if (selectedVoiceChannelId === deleteData.channel_id) {
+                        setSelectedVoiceChannelId(null);
+                    }
+
+                    setChannelGroups((prevGroups) =>
+                        prevGroups.map((group) => ({
+                            ...group,
+                            channels: group.channels.filter(
+                                (channel) =>
+                                    channel.id !== deleteData.channel_id,
+                            ),
+                        })),
+                    );
+                    toast.info("Channel deleted");
+                    break;
+                }
+
                 case MESSAGE_TYPES.CHANNEL_UPDATE: {
                     const updates = (message.data as ChannelUpdateBroadcast)
                         .channels;
@@ -335,6 +447,212 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                     });
                     break;
                 }
+
+                case MESSAGE_TYPES.ROLE_CREATED: {
+                    const roleData = message.data as RoleCreatedBroadcast;
+                    const newRole: Role = {
+                        id: roleData.id,
+                        name: roleData.name,
+                        color: roleData.color,
+                        rank: roleData.rank,
+                        permissions: roleData.permissions,
+                        assignable: roleData.assignable,
+                        display_role_members: roleData.display_role_members,
+                    };
+
+                    setRoles((prevRoles) => {
+                        const updatedRoles = [...prevRoles, newRole];
+                        // Sort by rank
+                        updatedRoles.sort((a, b) => b.rank - a.rank);
+                        return updatedRoles;
+                    });
+                    toast.success(`New role "${roleData.name}" created`);
+                    break;
+                }
+
+                case MESSAGE_TYPES.ROLE_UPDATED: {
+                    const roleData = message.data as Role;
+                    setRoles((prevRoles) => {
+                        const updatedRoles = prevRoles.map((role) =>
+                            role.id === roleData.id
+                                ? {
+                                      id: roleData.id,
+                                      name: roleData.name,
+                                      color: roleData.color,
+                                      rank: roleData.rank,
+                                      permissions: roleData.permissions,
+                                      assignable: roleData.assignable,
+                                      display_role_members:
+                                          roleData.display_role_members,
+                                  }
+                                : role,
+                        );
+                        // Sort by rank
+                        updatedRoles.sort((a, b) => b.rank - a.rank);
+                        return updatedRoles;
+                    });
+                    toast.success(`Role "${roleData.name}" updated`);
+                    break;
+                }
+
+                case MESSAGE_TYPES.ROLE_DELETED: {
+                    const deleteData = message.data as RoleDeletedBroadcast;
+                    setRoles((prevRoles) =>
+                        prevRoles.filter(
+                            (role) => role.id !== deleteData.role_id,
+                        ),
+                    );
+                    // Remove role from all users
+                    setUsers((prevUsers) =>
+                        prevUsers.map((user) => ({
+                            ...user,
+                            roles: user.roles.filter(
+                                (role) => role.id !== deleteData.role_id,
+                            ),
+                        })),
+                    );
+                    toast.info("Role deleted");
+                    break;
+                }
+
+                case MESSAGE_TYPES.ROLE_ASSIGNED: {
+                    const assignData = message.data as RoleAssignedBroadcast;
+                    const role = roles.find((r) => r.id === assignData.role_id);
+                    if (role) {
+                        setUsers((prevUsers) =>
+                            prevUsers.map((user) => {
+                                if (user.id === assignData.user_id) {
+                                    // Check if user already has this role
+                                    const hasRole = user.roles.some(
+                                        (r) => r.id === role.id,
+                                    );
+                                    if (!hasRole) {
+                                        return {
+                                            ...user,
+                                            roles: [...user.roles, role],
+                                        };
+                                    }
+                                }
+                                return user;
+                            }),
+                        );
+
+                        const user = users.find(
+                            (u) => u.id === assignData.user_id,
+                        );
+                        if (user) {
+                            toast.success(
+                                `Role "${role.name}" assigned to ${user.nickname || user.username}`,
+                            );
+                        }
+                    }
+                    break;
+                }
+
+                case MESSAGE_TYPES.ROLE_REMOVED: {
+                    const removeData = message.data as RoleRemovedBroadcast;
+                    const role = roles.find((r) => r.id === removeData.role_id);
+                    setUsers((prevUsers) =>
+                        prevUsers.map((user) => {
+                            if (user.id === removeData.user_id) {
+                                return {
+                                    ...user,
+                                    roles: user.roles.filter(
+                                        (r) => r.id !== removeData.role_id,
+                                    ),
+                                };
+                            }
+                            return user;
+                        }),
+                    );
+
+                    const user = users.find((u) => u.id === removeData.user_id);
+                    if (user && role) {
+                        toast.info(
+                            `Role "${role.name}" removed from ${user.nickname || user.username}`,
+                        );
+                    }
+                    break;
+                }
+
+                case MESSAGE_TYPES.USER_UPDATED: {
+                    const updateData = message.data as UserUpdatedBroadcast;
+                    setUsers((prevUsers) =>
+                        prevUsers.map((user) =>
+                            user.id === updateData.user_id
+                                ? { ...user, nickname: updateData.nickname }
+                                : user,
+                        ),
+                    );
+
+                    const user = users.find((u) => u.id === updateData.user_id);
+                    if (user) {
+                        toast.info(
+                            `${user.username}'s nickname updated to "${updateData.nickname}"`,
+                        );
+                    }
+                    break;
+                }
+
+                case MESSAGE_TYPES.USER_PROFILE_UPDATED: {
+                    const profileData =
+                        message.data as UserProfileUpdatedBroadcast;
+                    setUsers((prevUsers) =>
+                        prevUsers.map((user) =>
+                            user.id === profileData.user_id
+                                ? {
+                                      ...user,
+                                      profile_picture_url:
+                                          profileData.profile_picture_url,
+                                  }
+                                : user,
+                        ),
+                    );
+
+                    const user = users.find(
+                        (u) => u.id === profileData.user_id,
+                    );
+                    if (user) {
+                        toast.info(
+                            `${user.nickname || user.username} updated their profile picture`,
+                        );
+                    }
+                    break;
+                }
+
+                case MESSAGE_TYPES.USER_LEFT: {
+                    const leftData = message.data as UserLeftBroadcast;
+                    setUsers((prevUsers) =>
+                        prevUsers.filter(
+                            (user) => user.id !== leftData.user_id,
+                        ),
+                    );
+                    toast.info(
+                        `${leftData.nickname || leftData.username} left the server`,
+                    );
+                    break;
+                }
+
+                case MESSAGE_TYPES.SERVER_ICON_UPDATED: {
+                    const iconData = message.data as ServerIconUpdatedBroadcast;
+                    updateServerStatusCache({ icon: iconData.icon_url });
+                    toast.success("Server icon updated");
+                    break;
+                }
+
+                case MESSAGE_TYPES.SERVER_CONFIG_UPDATED: {
+                    const configData =
+                        message.data as ServerConfigUpdatedBroadcast;
+                    updateServerStatusCache({
+                        name: configData.name,
+                        description: configData.description,
+                        allow_invite: configData.allow_invite,
+                        max_users: configData.max_users,
+                        max_attachments: configData.max_attachments,
+                    });
+                    toast.success("Server configuration updated");
+                    break;
+                }
             }
         };
 
@@ -343,7 +661,14 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         return () => {
             webSocketManager.removeMessageHandler(userId, handleMessage);
         };
-    }, [userId]);
+    }, [
+        userId,
+        roles,
+        users,
+        selectedChannelId,
+        selectedVoiceChannelId,
+        updateServerStatusCache,
+    ]);
 
     // Leave current server
     const leaveCurrentServer = React.useCallback(async () => {

@@ -50,7 +50,7 @@ export function UserContextMenu({
     openProfile,
 }: UserContextMenuProps) {
     const { currentUser, userId } = useCurrentUser();
-    const { serverRecord, roles: serverRoles, refreshServerData } = useServer();
+    const { serverRecord, roles: serverRoles } = useServer();
     const [isLoading, setIsLoading] = useState(false);
     const [showNicknameEdit, setShowNicknameEdit] = useState(false);
 
@@ -105,7 +105,6 @@ export function UserContextMenu({
         try {
             await assignRole(serverRecord.server_url, userId, user.id, roleId);
             toast.success("Role assigned successfully");
-            await refreshServerData(); // Refresh to get updated user data
         } catch (error) {
             toast.error((error as Error).message || "Failed to assign role");
             console.error("Error assigning role:", error);
@@ -121,7 +120,6 @@ export function UserContextMenu({
         try {
             await removeRole(serverRecord.server_url, userId, user.id, roleId);
             toast.success("Role removed successfully");
-            await refreshServerData(); // Refresh to get updated user data
         } catch (error) {
             toast.error((error as Error).message || "Failed to remove role");
             console.error("Error removing role:", error);
@@ -288,7 +286,7 @@ export function EditNicknameModal({
     onClose,
 }: EditNicknameModalProps) {
     const { userId } = useCurrentUser();
-    const { serverRecord, refreshServerData } = useServer();
+    const { serverRecord } = useServer();
     const [nickname, setNickname] = useState(user.nickname);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -313,7 +311,6 @@ export function EditNicknameModal({
                 nickname.trim(),
             );
             toast.success("Nickname updated successfully");
-            await refreshServerData(); // Refresh to get updated user data
             onClose();
         } catch (error) {
             toast.error(

@@ -2,7 +2,7 @@ import { ServerRecord } from "@/storage/server-store";
 import { VoiceClient, VoiceEventData } from "@/api/voice";
 import { toast } from "sonner";
 import { inDevelopment } from "@/config";
-import { Attachment } from "@/api/server";
+import { Attachment, Permission } from "@/api/server";
 
 export interface WebSocketMessage {
     type: string;
@@ -60,17 +60,158 @@ export type ChannelUpdateBroadcast = {
     channels: ChannelUpdateBroadcastItem[];
 };
 
+export interface GroupCreatedBroadcast {
+    id: number;
+    name: string;
+}
+
+export interface ChannelCreatedBroadcast {
+    id: number;
+    name: string;
+    description: string;
+    group_id: number;
+    group_name: string;
+    position: number;
+    type: string;
+    is_voice: boolean;
+}
+
+export interface ChannelDeletedBroadcast {
+    channel_id: number;
+}
+
+export interface ChannelPermissionResponse {
+    id: number;
+    channel_id: number;
+    user_id?: string;
+    role_name?: string;
+    can_read: boolean;
+    can_write: boolean;
+    can_pin: boolean;
+    is_admin: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface ChannelPermissionUpdatedBroadcast {
+    channel_id: number;
+    permission: ChannelPermissionResponse;
+}
+
+export interface ChannelPermissionDeletedBroadcast {
+    channel_id: number;
+    user_id?: string;
+    role_name?: string;
+}
+
+export interface MessagePinnedBroadcast {
+    message_id: number;
+    channel_id: number;
+    pinned_by: string;
+}
+
+export interface MessageUnpinnedBroadcast {
+    message_id: number;
+    channel_id: number;
+    unpinned_by: string;
+}
+
+export interface RoleCreatedBroadcast {
+    id: string;
+    name: string;
+    color: string;
+    rank: number;
+    permissions: Permission[];
+    assignable: boolean;
+    display_role_members: boolean;
+}
+
+export interface RoleDeletedBroadcast {
+    role_id: string;
+}
+
+export interface RoleAssignedBroadcast {
+    user_id: string;
+    role_id: string;
+}
+
+export interface RoleRemovedBroadcast {
+    user_id: string;
+    role_id: string;
+}
+
+export interface UserUpdatedBroadcast {
+    user_id: string;
+    nickname: string;
+    updated_by: string;
+}
+
+export interface UserProfileUpdatedBroadcast {
+    user_id: string;
+    profile_picture_url: string;
+}
+
+export interface UserLeftBroadcast {
+    user_id: string;
+    username: string;
+    nickname: string;
+}
+
+export interface ServerIconUpdatedBroadcast {
+    icon_url: string;
+}
+
+export interface ServerConfigUpdatedBroadcast {
+    name: string;
+    description: string;
+    allow_invite: boolean;
+    max_users: number;
+    max_attachments: number;
+}
+
 export const MESSAGE_TYPES = {
+    // Connection and user status
     ONLINE_USERS: "online_users",
     USER_STATUS: "user_status",
+
+    // Message events
     MESSAGE_BROADCAST: "new_message",
     MESSAGE_DELETED: "message_deleted",
     MESSAGE_EDITED: "message_edited",
+    MESSAGE_PINNED: "message_pinned",
+    MESSAGE_UNPINNED: "message_unpinned",
+
+    // Channel events
+    GROUP_CREATED: "group_created",
+    CHANNEL_CREATED: "channel_created",
+    CHANNEL_DELETED: "channel_deleted",
+    CHANNEL_UPDATE: "channel_update",
+    CHANNEL_PERMISSION_UPDATED: "channel_permission_updated",
+    CHANNEL_PERMISSION_DELETED: "channel_permission_deleted",
+
+    // Role events
+    ROLE_CREATED: "role_created",
+    ROLE_UPDATED: "role_updated",
+    ROLE_DELETED: "role_deleted",
+    ROLE_ASSIGNED: "role_assigned",
+    ROLE_REMOVED: "role_removed",
+
+    // User events
+    USER_UPDATED: "user_updated",
+    USER_PROFILE_UPDATED: "user_profile_updated",
+    USER_LEFT: "user_left",
+
+    // Server events
+    SERVER_ICON_UPDATED: "server_icon_updated",
+    SERVER_CONFIG_UPDATED: "server_config_updated",
+
+    // Voice events
     USER_JOINED_VOICE: "user_joined_voice",
     USER_LEFT_VOICE: "user_left_voice",
     VOICE_STATE_UPDATE: "voice_state_update",
     SPEAKING_UPDATE: "speaking_update",
-    CHANNEL_UPDATE: "channel_update",
+
+    // WebRTC events
     WEBRTC_CONFIG: "webrtc_config",
     CREATE_WEBRTC_OFFER: "create_webrtc_offer",
     WEBRTC_ANSWER: "webrtc_answer",

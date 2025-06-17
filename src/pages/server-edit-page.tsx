@@ -407,7 +407,6 @@ export default function ServerEditPage() {
             );
             toast.success("Server icon updated successfully");
             clearServerStatusCache();
-            refreshServerData();
         } catch {
             toast.error("Failed to upload server icon");
         } finally {
@@ -437,7 +436,6 @@ export default function ServerEditPage() {
 
             toast.success("Server configuration updated successfully");
             clearServerStatusCache();
-            refreshServerData();
         } catch {
             toast.error("Failed to update server configuration");
         } finally {

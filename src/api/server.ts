@@ -17,6 +17,7 @@ export interface Channel {
     group_id: number;
     group_name: string;
     is_voice: boolean;
+    type?: string;
     permissions?: ChannelPermission[];
     participants: VoiceParticipant[] | null;
 }
