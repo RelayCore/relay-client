@@ -85,6 +85,21 @@ export default function ServerPage() {
         [setSelectedChannelId, serverRecord?.server_url],
     );
 
+    React.useEffect(() => {
+        if (!selectedChannelId && channelGroups.length > 0) {
+            // Find the first non-voice channel
+            for (const group of channelGroups) {
+                const firstTextChannel = group.channels.find(
+                    (c) => !c.is_voice,
+                );
+                if (firstTextChannel) {
+                    handleSelectChannel(firstTextChannel.id);
+                    break;
+                }
+            }
+        }
+    }, [selectedChannelId, channelGroups, handleSelectChannel]);
+
     const getSelectedChannelName = React.useCallback(() => {
         if (!selectedChannelId) {
             // Find the first non-voice channel
