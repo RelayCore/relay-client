@@ -41,6 +41,7 @@ import {
     isChannelUnread,
     updateChannelLastMessage,
 } from "@/utils/server-localstorage";
+import { cacheManager } from "@/utils/cache-manager";
 
 interface ServerContextState {
     // Server data
@@ -174,6 +175,7 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
     // Fetch server data
     const refreshServerData = React.useCallback(async () => {
         if (!userId) return;
+        console.log(`Refreshing server data for user: ${userId}`);
 
         try {
             setLoading(true);
@@ -183,27 +185,21 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
             const record = await getServerById(userId);
             setServerRecord(record);
 
-            // Fetch channels
-            const channelsResponse = await getChannels(
-                record.server_url,
-                userId,
-            );
+            const [channelsResponse, usersResponse, rolesResponse] =
+                await Promise.all([
+                    getChannels(record.server_url, userId),
+                    getUsers(record.server_url, userId),
+                    getRoles(record.server_url, userId),
+                ]);
+
+            // Update cache
+            cacheManager.setChannelGroups(userId, channelsResponse.groups);
+            cacheManager.setUsers(userId, usersResponse.users);
+            cacheManager.setRoles(userId, rolesResponse.roles);
+
+            // Update state if there are differences
             setChannelGroups(channelsResponse.groups);
-
-            // Select first channel if none selected
-            if (channelsResponse.groups.length > 0) {
-                const firstChannel = channelsResponse.groups[0]?.channels[0];
-                if (firstChannel) {
-                    setSelectedChannelId(firstChannel.id);
-                }
-            }
-
-            // Fetch users
-            const usersResponse = await getUsers(record.server_url, userId);
             setUsers(usersResponse.users);
-
-            // Fetch roles
-            const rolesResponse = await getRoles(record.server_url, userId);
             setRoles(rolesResponse.roles);
         } catch (err) {
             setError(
@@ -317,7 +313,12 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
             switch (message.type) {
                 case MESSAGE_TYPES.USER_STATUS: {
                     const statusData = message.data as UserStatusData;
-                    // Update user online status
+                    // Update cache
+                    cacheManager.updateUser(userId, {
+                        id: statusData.user_id,
+                        is_online: statusData.status === "online",
+                    });
+                    // Update state
                     setUsers((prevUsers) =>
                         prevUsers.map((user) =>
                             user.id === statusData.user_id
@@ -350,9 +351,17 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                         channel_id: number;
                     };
 
-                    // Update the channel's last_message_at timestamp
-                    setChannelGroups((prevGroups) =>
-                        prevGroups.map((group) => ({
+                    // Add to cache
+                    cacheManager.addMessage(
+                        userId,
+                        messageData.channel_id,
+                        messageData,
+                    );
+
+                    // Update channel's last_message_at in cache and state
+                    const cachedGroups = cacheManager.getChannelGroups(userId);
+                    if (cachedGroups) {
+                        const updatedGroups = cachedGroups.map((group) => ({
                             ...group,
                             channels: group.channels.map((channel) =>
                                 channel.id === messageData.channel_id
@@ -363,10 +372,12 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                                       }
                                     : channel,
                             ),
-                        })),
-                    );
+                        }));
+                        cacheManager.setChannelGroups(userId, updatedGroups);
+                        setChannelGroups(updatedGroups);
+                    }
 
-                    // Update localStorage with the new message timestamp
+                    // Update localStorage
                     if (serverRecord?.server_url) {
                         updateChannelLastMessage(
                             serverRecord.server_url,
@@ -374,7 +385,6 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                             messageData.created_at,
                         );
                     }
-
                     break;
                 }
 
@@ -394,23 +404,26 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
 
                 case MESSAGE_TYPES.CHANNEL_CREATED: {
                     const channelData = message.data as ChannelCreatedBroadcast;
+                    const newChannel: Channel = {
+                        id: channelData.id,
+                        name: channelData.name,
+                        description: channelData.description,
+                        group_id: channelData.group_id,
+                        group_name: channelData.group_name,
+                        position: channelData.position,
+                        type: channelData.type,
+                        is_voice: channelData.is_voice,
+                        permissions: [],
+                        participants: [],
+                    };
+
+                    // Add to cache
+                    cacheManager.addChannel(userId, newChannel);
+
+                    // Update state
                     setChannelGroups((prevGroups) =>
                         prevGroups.map((group) => {
                             if (group.id === channelData.group_id) {
-                                const newChannel: Channel = {
-                                    id: channelData.id,
-                                    name: channelData.name,
-                                    description: channelData.description,
-                                    group_id: channelData.group_id,
-                                    group_name: channelData.group_name,
-                                    position: channelData.position,
-                                    type: channelData.type,
-                                    is_voice: channelData.is_voice,
-                                    permissions: [],
-                                    participants: [],
-                                };
-
-                                // Insert channel in correct position
                                 const updatedChannels = [
                                     ...group.channels,
                                     newChannel,
@@ -418,7 +431,6 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                                 updatedChannels.sort(
                                     (a, b) => a.position - b.position,
                                 );
-
                                 return { ...group, channels: updatedChannels };
                             }
                             return group;
@@ -430,6 +442,10 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
 
                 case MESSAGE_TYPES.CHANNEL_DELETED: {
                     const deleteData = message.data as ChannelDeletedBroadcast;
+
+                    // Remove from cache
+                    cacheManager.deleteChannel(userId, deleteData.channel_id);
+
                     // Clear selection if deleted channel was selected
                     if (selectedChannelId === deleteData.channel_id) {
                         setSelectedChannelId(null);
@@ -438,6 +454,7 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                         setSelectedVoiceChannelId(null);
                     }
 
+                    // Update state
                     setChannelGroups((prevGroups) =>
                         prevGroups.map((group) => ({
                             ...group,
@@ -757,11 +774,8 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
 
         // Disconnect websocket
         webSocketManager.disconnect(userId);
-
-        // Remove from local storage
         await removeServer(serverRecord.server_url, userId);
-
-        // Clear server status cache
+        cacheManager.clearServerCache(userId);
         clearServerStatusCache();
 
         // Navigate back to home

@@ -162,7 +162,7 @@ interface SkinToneContextMenuProps {
     children: React.ReactNode;
 }
 
-function SkinToneContextMenu({
+const SkinToneContextMenu = React.memo(function SkinToneContextMenu({
     baseEmoji,
     onEmojiSelect,
     isOpen,
@@ -216,9 +216,12 @@ function SkinToneContextMenu({
             </PopoverContent>
         </Popover>
     );
-}
+});
 
-export function EmojiPopup({ onEmojiSelect, children }: EmojiPopupProps) {
+export const EmojiPopup = React.memo(function EmojiPopup({
+    onEmojiSelect,
+    children,
+}: EmojiPopupProps) {
     const [searchQuery, setSearchQuery] = React.useState("");
     const [selectedCategory, setSelectedCategory] = React.useState<string>("");
     const [open, setOpen] = React.useState(false);
@@ -440,4 +443,4 @@ export function EmojiPopup({ onEmojiSelect, children }: EmojiPopupProps) {
             </PopoverContent>
         </Popover>
     );
-}
+});

@@ -58,6 +58,7 @@ export interface Message {
     username: string;
     content: string;
     created_at: string;
+    updated_at: string;
     attachments: Attachment[];
     pinned: boolean;
     tagged_users?: TaggedUser[];

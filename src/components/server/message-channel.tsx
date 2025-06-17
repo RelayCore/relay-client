@@ -19,7 +19,6 @@ import {
     formatFileSize,
     getChannelMessages,
     sendMessageWithAttachments,
-    getChannels,
     Channel,
     canWriteToChannel,
     editMessage,
@@ -43,6 +42,7 @@ import { CustomVideoPlayer } from "./video-player";
 import { UserAvatar } from "./user-avatar";
 import { MentionsPopup } from "./mention-popup";
 import { toast } from "sonner";
+import { cacheManager } from "@/utils/cache-manager";
 
 type MessageContentPart = {
     type: "text" | "mention" | "tag" | "link" | "emoji";
@@ -347,7 +347,7 @@ export default function MessageChannel({
     const mentionAnchorRef = React.useRef<HTMLDivElement>(null);
 
     const { currentUser } = useCurrentUser();
-    const { serverInfo } = useServer();
+    const { serverInfo, getSelectedChannel } = useServer();
     const { users } = useMembers();
 
     const scrollToBottom = React.useCallback(() => {
@@ -393,6 +393,7 @@ export default function MessageChannel({
                             username: messageData.username || "",
                             content: messageData.content,
                             created_at: messageData.created_at,
+                            updated_at: messageData.updated_at || "",
                             attachments: [],
                             pinned: false,
                         };
@@ -413,6 +414,11 @@ export default function MessageChannel({
                 }
                 case MESSAGE_TYPES.MESSAGE_DELETED: {
                     const deleteData = message.data as MessageDeletedBroadcast;
+                    cacheManager.deleteMessage(
+                        currentUserId,
+                        channelId,
+                        deleteData.message_id,
+                    );
                     if (deleteData.channel_id === channelId) {
                         setMessages((prev) =>
                             prev.filter(
@@ -424,6 +430,16 @@ export default function MessageChannel({
                 }
                 case MESSAGE_TYPES.MESSAGE_EDITED: {
                     const editData = message.data as MessageEditedBroadcast;
+                    cacheManager.updateMessage(
+                        currentUserId,
+                        channelId,
+                        editData.id,
+                        {
+                            content: editData.content,
+                            updated_at: editData.updated_at,
+                        },
+                    );
+
                     if (editData.channel_id === channelId) {
                         setMessages((prev) =>
                             prev.map((msg) =>
@@ -464,6 +480,18 @@ export default function MessageChannel({
         const fetchMessages = async () => {
             if (!channelId || !currentUserId) return;
 
+            // Try cache first
+            const cachedMessages = cacheManager.getMessages(
+                currentUserId,
+                channelId,
+            );
+            if (cachedMessages && cachedMessages.length > 0) {
+                setMessages(cachedMessages);
+                setLoading(false);
+                return;
+            }
+
+            // No cache, fetch fresh
             setLoading(true);
             setError(null);
 
@@ -475,13 +503,19 @@ export default function MessageChannel({
                     50,
                     0,
                 );
-                // Sort messages by creation date to ensure proper order
+
                 const sortedMessages = response.messages.sort(
                     (a, b) =>
                         new Date(a.created_at).getTime() -
                         new Date(b.created_at).getTime(),
                 );
+
                 setMessages(sortedMessages);
+                cacheManager.setMessages(
+                    currentUserId,
+                    channelId,
+                    sortedMessages,
+                );
             } catch (err) {
                 setError(
                     err instanceof Error
@@ -906,26 +940,11 @@ export default function MessageChannel({
         };
     }, [openedImage]);
 
-    // Fetch current channel data to check permissions
+    // Get current channel data using getSelectedChannel instead of fetching all channels
     React.useEffect(() => {
-        const fetchChannelData = async () => {
-            if (!channelId || !currentUserId) return;
-
-            try {
-                const response = await getChannels(serverUrl, currentUserId);
-                const channel = response.groups
-                    .flatMap((group) => group.channels)
-                    .find((ch) => ch.id === channelId);
-
-                setCurrentChannel(channel || null);
-            } catch (err) {
-                console.error("Failed to fetch channel data:", err);
-                setCurrentChannel(null);
-            }
-        };
-
-        fetchChannelData();
-    }, [channelId, currentUserId, serverUrl]);
+        const channel = getSelectedChannel();
+        setCurrentChannel(channel);
+    }, [getSelectedChannel]);
 
     const handleEmojiSelect = React.useCallback(
         (emoji: string) => {
