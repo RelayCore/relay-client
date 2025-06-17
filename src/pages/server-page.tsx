@@ -124,14 +124,14 @@ export default function ServerPage() {
                         className="bg-sidebar"
                     ></ResizablePanel>
 
-                    <ResizableHandle />
+                    <ResizableHandle className="transition-transform duration-200 hover:scale-x-400" />
 
                     <ResizablePanel
                         defaultSize={panelSizes.messages}
                     ></ResizablePanel>
                     {showMembers && (
                         <>
-                            <ResizableHandle />
+                            <ResizableHandle className="transition-transform duration-200 hover:scale-x-400" />
                             <ResizablePanel
                                 defaultSize={panelSizes.members}
                                 minSize={15}
@@ -185,7 +185,7 @@ export default function ServerPage() {
                     <ChannelList onSelectChannel={handleSelectChannel} />
                 </ResizablePanel>
 
-                <ResizableHandle />
+                <ResizableHandle className="transition-transform duration-200 hover:scale-x-400" />
 
                 {/* Messages */}
                 <ResizablePanel defaultSize={panelSizes.messages}>
@@ -200,7 +200,7 @@ export default function ServerPage() {
                 {/* Members sidebar */}
                 {showMembers && (
                     <>
-                        <ResizableHandle />
+                        <ResizableHandle className="transition-transform duration-200 hover:scale-x-400" />
                         <ResizablePanel
                             defaultSize={panelSizes.members}
                             minSize={15}
