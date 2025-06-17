@@ -89,10 +89,54 @@ export default function MessageChannel({
     const { serverInfo, getSelectedChannel } = useServer();
     const { users } = useMembers();
 
+    const distanceFromBottomRef = React.useRef(0);
+    const handleMessagesScroll = React.useCallback(() => {
+        const container = messagesContainerRef.current;
+        if (container) {
+            const { scrollTop, scrollHeight, clientHeight } = container;
+            distanceFromBottomRef.current =
+                scrollHeight - scrollTop - clientHeight;
+        }
+    }, []);
+
+    React.useEffect(() => {
+        const container = messagesContainerRef.current;
+        if (!container) return;
+        container.addEventListener("scroll", handleMessagesScroll);
+
+        handleMessagesScroll();
+        return () => {
+            container.removeEventListener("scroll", handleMessagesScroll);
+        };
+    }, [handleMessagesScroll]);
+
+    // Only scroll if user is near the bottom (within 100px)
     const scrollToBottom = React.useCallback(() => {
+        if (
+            messagesContainerRef.current &&
+            distanceFromBottomRef.current < 100
+        ) {
+            requestAnimationFrame(() => {
+                if (
+                    messagesContainerRef.current &&
+                    distanceFromBottomRef.current < 100
+                ) {
+                    messagesContainerRef.current.scrollTop =
+                        messagesContainerRef.current.scrollHeight;
+                }
+            });
+        }
+    }, []);
+
+    // Always scroll (for initial load)
+    const scrollToBottomForced = React.useCallback(() => {
         if (messagesContainerRef.current) {
-            messagesContainerRef.current.scrollTop =
-                messagesContainerRef.current.scrollHeight;
+            requestAnimationFrame(() => {
+                if (messagesContainerRef.current) {
+                    messagesContainerRef.current.scrollTop =
+                        messagesContainerRef.current.scrollHeight;
+                }
+            });
         }
     }, []);
 
@@ -270,15 +314,15 @@ export default function MessageChannel({
         fetchMessages();
     }, [channelId, currentUserId, serverUrl]);
 
-    // Scroll to bottom when messages change
+    // Scroll to bottom when messages change (conditional)
     React.useEffect(() => {
         scrollToBottom();
     }, [messages, scrollToBottom]);
 
-    // Scroll to bottom on initial render
+    // Scroll to bottom on initial render (forced)
     React.useEffect(() => {
-        scrollToBottom();
-    }, [scrollToBottom]);
+        scrollToBottomForced();
+    }, [scrollToBottomForced]);
 
     const handleSend = async () => {
         if (
@@ -1088,6 +1132,7 @@ export default function MessageChannel({
                                     onEditingTextChange={setEditingText}
                                     onEditSave={handleEditSave}
                                     onEditCancel={handleEditCancel}
+                                    onContentLoad={scrollToBottom} // Add scroll callback
                                 />
                             );
 

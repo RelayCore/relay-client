@@ -64,6 +64,7 @@ export function MessageItem({
     onEditingTextChange,
     onEditSave,
     onEditCancel,
+    onContentLoad, // Add this prop
 }: {
     message: Message;
     showHeader?: boolean;
@@ -77,6 +78,7 @@ export function MessageItem({
     onEditingTextChange?: (text: string) => void;
     onEditSave?: (messageId: number, content: string) => void;
     onEditCancel?: () => void;
+    onContentLoad?: () => void; // Add this prop
 }) {
     const { users } = useMembers();
     const formattedDate = formatMessageDate(message.created_at);
@@ -154,7 +156,7 @@ export function MessageItem({
 
     // Effect to fetch OpenGraph data for links
     React.useEffect(() => {
-        let isActive = true; // Flag to prevent state updates on unmounted component
+        let isActive = true;
 
         const urlsToFetchDetails: { url: string; partContent: string }[] = [];
         messageContentParts.forEach((part) => {
@@ -167,7 +169,6 @@ export function MessageItem({
                     !(part.data.url in ogDataMap) ||
                     ogDataMap[part.data.url] === "error"
                 ) {
-                    // Fetch if not present or if previous attempt errored
                     urlsToFetchDetails.push({
                         url: part.data.url,
                         partContent: part.content,
@@ -201,6 +202,8 @@ export function MessageItem({
                                 url,
                             },
                         }));
+                        // Trigger scroll when OG data loads
+                        onContentLoad?.();
                     }
                 } catch (error) {
                     console.error("Error fetching OG data for", url, error);
@@ -214,9 +217,9 @@ export function MessageItem({
             });
         }
         return () => {
-            isActive = false; // Cleanup function to set isActive to false when component unmounts or effect re-runs
+            isActive = false;
         };
-    }, [messageContentParts]); // Intentionally not including ogDataMap to prevent infinite loops
+    }, [messageContentParts, onContentLoad]);
 
     const MessageContent = React.useMemo(() => {
         if (isEditing) {
@@ -268,6 +271,7 @@ export function MessageItem({
                     currentUserId={currentUserId}
                     ogDataMap={ogDataMap}
                     onImageClick={onImageClick}
+                    onContentLoad={onContentLoad} // Pass the callback down
                 />
             </div>
         );
@@ -281,7 +285,8 @@ export function MessageItem({
         handleEditKeyDown,
         onEditSave,
         onEditCancel,
-        ogDataMap, // Add ogDataMap as a dependency
+        ogDataMap,
+        onContentLoad, // Add to dependencies
     ]);
 
     return (
@@ -340,6 +345,7 @@ export function MessageItem({
                             key={attachment.id}
                             attachment={attachment}
                             onImageClick={onImageClick}
+                            onContentLoad={onContentLoad} // Pass the callback
                         />
                     ))}
                 </div>

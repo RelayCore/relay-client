@@ -24,6 +24,7 @@ export function ProcessedMessageContent({
     ogDataMap,
     onImageClick,
     disabledFeatures = [],
+    onContentLoad, // Add this prop
 }: {
     parts: MessageContentPart[];
     currentUserId?: string;
@@ -33,6 +34,7 @@ export function ProcessedMessageContent({
         sourceElement?: HTMLElement,
     ) => void;
     disabledFeatures?: DisabledFeature[];
+    onContentLoad?: () => void; // Add this prop
 }) {
     const isFeatureDisabled = (feature: DisabledFeature) =>
         disabledFeatures.includes(feature);
@@ -63,6 +65,7 @@ export function ProcessedMessageContent({
                                     content={part.content}
                                     url={linkData.url}
                                     onImageClick={onImageClick}
+                                    onContentLoad={onContentLoad} // Pass callback
                                 />
                             );
                         }
@@ -84,6 +87,7 @@ export function ProcessedMessageContent({
                                         ogData={ogEntry}
                                         originalUrlText={part.content}
                                         onImageClick={onImageClick}
+                                        onContentLoad={onContentLoad} // Pass callback
                                     />
                                 </React.Fragment>
                             );
@@ -180,6 +184,7 @@ function ImageLinkAttachment({
     content,
     url,
     onImageClick,
+    onContentLoad, // Add this prop
 }: {
     content: string;
     url: string;
@@ -187,6 +192,7 @@ function ImageLinkAttachment({
         attachment: Attachment,
         sourceElement?: HTMLElement,
     ) => void;
+    onContentLoad?: () => void; // Add this prop
 }) {
     // Create a mock attachment object for the image link
     const mockAttachment: Attachment = {
@@ -207,6 +213,7 @@ function ImageLinkAttachment({
             <AttachmentItem
                 attachment={mockAttachment}
                 onImageClick={onImageClick}
+                onContentLoad={onContentLoad} // Pass callback
             />
         </div>
     );
@@ -219,6 +226,7 @@ function OpenGraphPreviewSpan({
     ogData,
     originalUrlText,
     onImageClick,
+    onContentLoad, // Add this prop
 }: {
     ogData: OGData;
     originalUrlText: string;
@@ -226,6 +234,7 @@ function OpenGraphPreviewSpan({
         attachment: Attachment,
         sourceElement?: HTMLElement,
     ) => void;
+    onContentLoad?: () => void; // Add this prop
 }) {
     const { title, description, imageUrl, siteName, url: ogUrl } = ogData;
 
@@ -272,6 +281,7 @@ function OpenGraphPreviewSpan({
                             alt={title || "OpenGraph image"}
                             className="h-auto max-h-[98px] w-full cursor-pointer rounded border object-contain transition-opacity hover:opacity-80"
                             onClick={handleImageClick}
+                            onLoad={() => onContentLoad?.()} // Trigger scroll when image loads
                             onError={(e) =>
                                 (e.currentTarget.style.display = "none")
                             }

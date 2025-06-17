@@ -8,12 +8,14 @@ import { downloadFile } from "@/utils/assets";
 export function AttachmentItem({
     attachment,
     onImageClick,
+    onContentLoad, // Add this prop
 }: {
     attachment: Attachment;
     onImageClick?: (
         attachment: Attachment,
         sourceElement?: HTMLElement,
     ) => void;
+    onContentLoad?: () => void; // Add this prop
 }) {
     const isImage = attachment.type === "image";
     const isVideo = attachment.type === "video";
@@ -44,6 +46,7 @@ export function AttachmentItem({
                     src={attachment.file_path}
                     alt={attachment.file_name}
                     className="border-border max-h-[300px] max-w-full rounded-md border object-contain"
+                    onLoad={() => onContentLoad?.()} // Trigger scroll when image loads
                 />
                 <div className="absolute right-0 bottom-0 left-0 flex items-center justify-between bg-black/60 p-2 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
                     <span className="max-w-[200px] truncate">
