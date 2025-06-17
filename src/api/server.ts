@@ -45,6 +45,12 @@ export interface Attachment {
     updated_at: string;
 }
 
+export interface TaggedUser {
+    user_id: string;
+    username: string;
+    nickname: string;
+}
+
 export interface Message {
     id: number;
     channel_id: number;
@@ -54,6 +60,7 @@ export interface Message {
     created_at: string;
     attachments: Attachment[];
     pinned: boolean;
+    tagged_users?: TaggedUser[];
 }
 
 export interface MessageSearchResponse {

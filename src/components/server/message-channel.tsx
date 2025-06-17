@@ -23,6 +23,7 @@ import {
     Channel,
     canWriteToChannel,
     editMessage,
+    User,
 } from "@/api/server";
 import {
     webSocketManager,
@@ -40,7 +41,262 @@ import { useServer } from "@/contexts/server-context";
 import { EmojiPopup } from "./emoji-popup";
 import { CustomVideoPlayer } from "./video-player";
 import { UserAvatar } from "./user-avatar";
+import { MentionsPopup } from "./mention-popup";
 import { toast } from "sonner";
+
+type MessageContentPart = {
+    type: "text" | "mention" | "tag" | "link" | "emoji";
+    content: string;
+    data?: {
+        user?: User;
+        url?: string;
+        tagName?: string;
+        emojiCode?: string;
+    };
+};
+
+class MessageContentProcessor {
+    private users: User[];
+
+    constructor(users: User[]) {
+        this.users = users;
+    }
+
+    /**
+     * Process message content and return an array of content parts
+     * This is the main entry point for all content processing
+     */
+    processContent(text: string): MessageContentPart[] {
+        let parts: MessageContentPart[] = [{ type: "text", content: text }];
+
+        // Apply processors in order
+        parts = this.processMentions(parts);
+        // Future processors can be added here:
+        // parts = this.processLinks(parts);
+
+        return parts;
+    }
+
+    /**
+     * Process @mentions in the content
+     */
+    private processMentions(parts: MessageContentPart[]): MessageContentPart[] {
+        const newParts: MessageContentPart[] = [];
+
+        for (const part of parts) {
+            if (part.type !== "text") {
+                newParts.push(part);
+                continue;
+            }
+
+            const mentionParts = this.extractMentions(part.content);
+            newParts.push(...mentionParts);
+        }
+
+        return newParts;
+    }
+
+    /**
+     * Extract mentions from a text string
+     */
+    private extractMentions(text: string): MessageContentPart[] {
+        const parts: MessageContentPart[] = [];
+        let lastIndex = 0;
+
+        const mentionRegex = /@(\w+)/g;
+        let match;
+
+        while ((match = mentionRegex.exec(text)) !== null) {
+            const [fullMatch, username] = match;
+            const startIndex = match.index;
+
+            // Add text before mention
+            if (startIndex > lastIndex) {
+                parts.push({
+                    type: "text",
+                    content: text.slice(lastIndex, startIndex),
+                });
+            }
+
+            // Find the mentioned user
+            const mentionedUser = this.users.find(
+                (user) => user.username === username,
+            );
+
+            // Add mention part
+            parts.push({
+                type: "mention",
+                content: fullMatch,
+                data: { user: mentionedUser },
+            });
+
+            lastIndex = startIndex + fullMatch.length;
+        }
+
+        // Add remaining text
+        if (lastIndex < text.length) {
+            parts.push({
+                type: "text",
+                content: text.slice(lastIndex),
+            });
+        }
+
+        return parts.length > 0 ? parts : [{ type: "text", content: text }];
+    }
+
+    /**
+     * Future method for processing tags like #general
+     */
+    private processTags(parts: MessageContentPart[]): MessageContentPart[] {
+        const newParts: MessageContentPart[] = [];
+
+        for (const part of parts) {
+            if (part.type !== "text") {
+                newParts.push(part);
+                continue;
+            }
+
+            // Tag processing logic would go here
+            // For now, just pass through
+            newParts.push(part);
+        }
+
+        return newParts;
+    }
+
+    /**
+     * Future method for processing links
+     */
+    private processLinks(parts: MessageContentPart[]): MessageContentPart[] {
+        const newParts: MessageContentPart[] = [];
+
+        for (const part of parts) {
+            if (part.type !== "text") {
+                newParts.push(part);
+                continue;
+            }
+
+            // Link processing logic would go here
+            // For now, just pass through
+            newParts.push(part);
+        }
+
+        return newParts;
+    }
+}
+
+/**
+ * Component for rendering processed message content
+ */
+function ProcessedMessageContent({
+    parts,
+    currentUserId,
+}: {
+    parts: MessageContentPart[];
+    currentUserId?: string;
+}) {
+    return (
+        <>
+            {parts.map((part, index) => {
+                switch (part.type) {
+                    case "mention":
+                        return (
+                            <MentionSpan
+                                key={index}
+                                content={part.content}
+                                user={part.data?.user}
+                                currentUserId={currentUserId}
+                            />
+                        );
+                    case "link":
+                        return (
+                            <LinkSpan
+                                key={index}
+                                content={part.content}
+                                url={part.data?.url}
+                            />
+                        );
+                    case "text":
+                    default:
+                        return (
+                            <span key={index}>
+                                {part.content
+                                    .split("\n")
+                                    .map((line, lineIndex, lines) => (
+                                        <React.Fragment key={lineIndex}>
+                                            {line}
+                                            {lineIndex < lines.length - 1 && (
+                                                <br />
+                                            )}
+                                        </React.Fragment>
+                                    ))}
+                            </span>
+                        );
+                }
+            })}
+        </>
+    );
+}
+
+/**
+ * Component for rendering mentions
+ */
+function MentionSpan({
+    content,
+    user,
+    currentUserId,
+}: {
+    content: string;
+    user?: User;
+    currentUserId?: string;
+}) {
+    const isCurrentUser = user?.id === currentUserId;
+
+    return (
+        <UserPopover
+            user={
+                user ?? {
+                    id: "unknown",
+                    username: "Unknown",
+                    nickname: "",
+                    roles: [],
+                    is_online: false,
+                    profile_picture_url: "",
+                }
+            }
+            currentUserId={currentUserId}
+        >
+            <span
+                className={cn(
+                    "cursor-pointer rounded px-1 py-0.25 text-xs font-medium whitespace-nowrap",
+                    user
+                        ? isCurrentUser
+                            ? "bg-yellow-500/20 text-yellow-600 hover:bg-yellow-500/30 dark:text-yellow-400"
+                            : "bg-blue-500/20 text-blue-600 hover:bg-blue-500/30 dark:text-blue-400"
+                        : "bg-gray-500/20 text-gray-600 dark:text-gray-400",
+                )}
+            >
+                {content}
+            </span>
+        </UserPopover>
+    );
+}
+
+/**
+ * Component for rendering links (future feature)
+ */
+function LinkSpan({ content, url }: { content: string; url?: string }) {
+    return (
+        <a
+            href={url || content}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent-positive hover:underline"
+        >
+            {content}
+        </a>
+    );
+}
 
 export interface MessageChannelProps {
     channelId: number;
@@ -77,12 +333,22 @@ export default function MessageChannel({
         number | null
     >(null);
     const [editingText, setEditingText] = React.useState("");
+
+    // Mention popup state
+    const [mentionPopupOpen, setMentionPopupOpen] = React.useState(false);
+    const [mentionSearchQuery, setMentionSearchQuery] = React.useState("");
+    const [mentionSelectedIndex, setMentionSelectedIndex] = React.useState(0);
+    const [mentionStartPos, setMentionStartPos] = React.useState(0);
+
     const messagesContainerRef = React.useRef<HTMLDivElement>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const dropZoneRef = React.useRef<HTMLDivElement>(null);
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+    const mentionAnchorRef = React.useRef<HTMLDivElement>(null);
+
     const { currentUser } = useCurrentUser();
-    const { serverInfo } = useServer(); // <-- get serverInfo from context
+    const { serverInfo } = useServer();
+    const { users } = useMembers();
 
     const scrollToBottom = React.useCallback(() => {
         if (messagesContainerRef.current) {
@@ -298,12 +564,165 @@ export default function MessageChannel({
         }
     };
 
+    // Handle text change for mentions
+    const handleTextChange = React.useCallback((newText: string) => {
+        setMessageText(newText);
+
+        if (!textareaRef.current) return;
+
+        const cursorPos = textareaRef.current.selectionStart;
+        const textBeforeCursor = newText.slice(0, cursorPos);
+
+        // Find the last @ symbol before cursor
+        const lastAtPos = textBeforeCursor.lastIndexOf("@");
+
+        if (lastAtPos === -1) {
+            // No @ found, close mention popup
+            setMentionPopupOpen(false);
+            setMentionSearchQuery("");
+            setMentionSelectedIndex(0);
+            return;
+        }
+
+        // Check if there's a space between @ and cursor (invalid mention)
+        const textAfterAt = textBeforeCursor.slice(lastAtPos + 1);
+        if (textAfterAt.includes(" ") || textAfterAt.includes("\n")) {
+            setMentionPopupOpen(false);
+            setMentionSearchQuery("");
+            setMentionSelectedIndex(0);
+            return;
+        }
+
+        // Valid mention context
+        setMentionStartPos(lastAtPos);
+        setMentionSearchQuery(textAfterAt);
+        setMentionSelectedIndex(0);
+        setMentionPopupOpen(true);
+
+        // Position the anchor element above the textarea
+        if (mentionAnchorRef.current && textareaRef.current) {
+            const textareaRect = textareaRef.current.getBoundingClientRect();
+
+            mentionAnchorRef.current.style.position = "fixed";
+            mentionAnchorRef.current.style.left = `${textareaRect.left}px`;
+            mentionAnchorRef.current.style.top = `${textareaRect.top - 8}px`;
+            mentionAnchorRef.current.style.width = "1px";
+            mentionAnchorRef.current.style.height = "1px";
+            mentionAnchorRef.current.style.pointerEvents = "none";
+        }
+    }, []);
+
+    const handleMentionSelect = React.useCallback(
+        (user: User) => {
+            if (!textareaRef.current) return;
+
+            const textarea = textareaRef.current;
+            const beforeMention = messageText.slice(0, mentionStartPos);
+            const afterCursor = messageText.slice(textarea.selectionStart);
+
+            // Create the mention text
+            const mentionText = `@${user.username}`;
+            const newText = beforeMention + mentionText + " " + afterCursor;
+
+            setMessageText(newText);
+            setMentionPopupOpen(false);
+            setMentionSearchQuery("");
+            setMentionSelectedIndex(0);
+
+            // Set cursor position after the mention
+            setTimeout(() => {
+                const newCursorPos = mentionStartPos + mentionText.length + 1;
+                textarea.setSelectionRange(newCursorPos, newCursorPos);
+                textarea.focus();
+            }, 0);
+        },
+        [messageText, mentionStartPos],
+    );
+
+    const handleMentionKeyDown = React.useCallback(
+        (e: React.KeyboardEvent) => {
+            if (!mentionPopupOpen) return;
+
+            // Filter users for the current search
+            const filteredUsers = users
+                .filter((user) => {
+                    const displayName = user.nickname || user.username;
+                    return (
+                        displayName
+                            .toLowerCase()
+                            .includes(mentionSearchQuery.toLowerCase()) ||
+                        user.username
+                            .toLowerCase()
+                            .includes(mentionSearchQuery.toLowerCase())
+                    );
+                })
+                .slice(0, 10);
+
+            if (filteredUsers.length === 0) return;
+
+            switch (e.key) {
+                case "ArrowUp":
+                    e.preventDefault();
+                    setMentionSelectedIndex((prev) =>
+                        prev <= 0 ? filteredUsers.length - 1 : prev - 1,
+                    );
+                    break;
+                case "ArrowDown":
+                    e.preventDefault();
+                    setMentionSelectedIndex((prev) =>
+                        prev >= filteredUsers.length - 1 ? 0 : prev + 1,
+                    );
+                    break;
+                case "Enter":
+                case "Tab": {
+                    e.preventDefault();
+                    const selectedUser = filteredUsers[mentionSelectedIndex];
+                    if (selectedUser) {
+                        handleMentionSelect(selectedUser);
+                    }
+                    break;
+                }
+                case "Escape":
+                    e.preventDefault();
+                    setMentionPopupOpen(false);
+                    setMentionSearchQuery("");
+                    setMentionSelectedIndex(0);
+                    break;
+            }
+        },
+        [
+            mentionPopupOpen,
+            mentionSearchQuery,
+            mentionSelectedIndex,
+            users,
+            handleMentionSelect,
+        ],
+    );
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
+        // Handle mention popup navigation first
+        handleMentionKeyDown(e);
+
+        // Don't send message if mention popup is open and user pressed Enter
+        if (mentionPopupOpen && e.key === "Enter") {
+            return;
+        }
+
         if (e.key === "Enter" && !e.shiftKey && !sending) {
             e.preventDefault();
             handleSend();
         }
     };
+
+    // Close mention popup when textarea loses focus
+    const handleTextareaBlur = React.useCallback(() => {
+        // Small delay to allow mention selection to work
+        setTimeout(() => {
+            setMentionPopupOpen(false);
+            setMentionSearchQuery("");
+            setMentionSelectedIndex(0);
+        }, 150);
+    }, []);
 
     const getFileKey = (file: File) =>
         `${file.name}-${file.size}-${file.lastModified}`;
@@ -577,6 +996,19 @@ export default function MessageChannel({
         setEditingText("");
     };
 
+    // Parse message text to identify mentions for styling
+    const parseMessageForDisplay = React.useCallback(
+        (text: string) => {
+            const processor = new MessageContentProcessor(users);
+            return processor.processContent(text);
+        },
+        [users],
+    );
+
+    const displayParts = React.useMemo(() => {
+        return parseMessageForDisplay(messageText);
+    }, [messageText, parseMessageForDisplay]);
+
     if (loading) {
         return <MessageChannelSkeleton />;
     }
@@ -639,6 +1071,30 @@ export default function MessageChannel({
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
         >
+            {/* Mention popup anchor - positioned above textarea */}
+            <div
+                ref={mentionAnchorRef}
+                style={{
+                    position: "fixed",
+                    pointerEvents: "none",
+                    zIndex: 1000,
+                }}
+            />
+
+            {/* Mention popup */}
+            <MentionsPopup
+                isOpen={mentionPopupOpen}
+                onClose={() => {
+                    setMentionPopupOpen(false);
+                    setMentionSearchQuery("");
+                    setMentionSelectedIndex(0);
+                }}
+                onMentionSelect={handleMentionSelect}
+                searchQuery={mentionSearchQuery}
+                selectedIndex={mentionSelectedIndex}
+                anchorRef={mentionAnchorRef}
+            />
+
             {/* Drag Overlay */}
             {isDragging && (
                 <div className="border-primary bg-accent/80 pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center rounded-md border-2 border-dashed p-4 text-center backdrop-blur-sm">
@@ -882,21 +1338,43 @@ export default function MessageChannel({
                         <Paperclip size={20} />
                     </Button>
 
-                    <Textarea
-                        ref={textareaRef}
-                        placeholder={
-                            canWrite
-                                ? `Message #${channelName}`
-                                : "You cannot send messages in this channel"
-                        }
-                        value={messageText}
-                        onChange={(e) => setMessageText(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        className="max-h-96 min-h-[40px] flex-grow resize-none overflow-y-auto"
-                        rows={1}
-                        disabled={sending || !canWrite}
-                        data-scrollbar-custom
-                    />
+                    <div className="relative flex-grow">
+                        {/* Rich text display overlay - always visible when there's text */}
+                        {messageText && (
+                            <div
+                                className={cn(
+                                    "pointer-events-none absolute inset-0 z-10 max-h-96 min-h-[40px] overflow-y-auto text-base md:text-sm",
+                                    "px-[0.8rem] py-[0.55rem]",
+                                )}
+                            >
+                                <ProcessedMessageContent
+                                    parts={displayParts}
+                                    currentUserId={currentUserId}
+                                />
+                            </div>
+                        )}
+
+                        <Textarea
+                            ref={textareaRef}
+                            placeholder={
+                                canWrite
+                                    ? `Message #${channelName}`
+                                    : "You cannot send messages in this channel"
+                            }
+                            value={messageText}
+                            onChange={(e) => handleTextChange(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            onBlur={handleTextareaBlur}
+                            className={cn(
+                                "max-h-96 min-h-[40px] flex-grow resize-none overflow-y-auto",
+                                messageText &&
+                                    "text-transparent caret-black dark:caret-white",
+                            )}
+                            rows={1}
+                            disabled={sending || !canWrite}
+                            data-scrollbar-custom
+                        />
+                    </div>
 
                     <EmojiPopup onEmojiSelect={handleEmojiSelect}>
                         <Button
@@ -1018,6 +1496,12 @@ function MessageItem({
         [onEditingTextChange],
     );
 
+    // Process message content for display
+    const messageContentParts = React.useMemo(() => {
+        const processor = new MessageContentProcessor(users);
+        return processor.processContent(message.content);
+    }, [message.content, users]);
+
     const MessageContent = React.useMemo(() => {
         if (isEditing) {
             return (
@@ -1063,13 +1547,17 @@ function MessageItem({
 
         return (
             <div className="text-sm break-words whitespace-pre-wrap">
-                {message.content}
+                <ProcessedMessageContent
+                    parts={messageContentParts}
+                    currentUserId={currentUserId}
+                />
             </div>
         );
     }, [
         isEditing,
         editingText,
-        message.content,
+        messageContentParts,
+        currentUserId,
         message.id,
         handleTextareaChange,
         handleEditKeyDown,
@@ -1088,7 +1576,7 @@ function MessageItem({
             {(showHeader && (
                 <div className="flex items-start gap-2">
                     <UserPopover user={user} currentUserId={currentUserId}>
-                        <div className="cursor-pointer self-start">
+                        <div className="cursor-pointer self-start pt-1">
                             <UserAvatar
                                 displayName={displayName}
                                 profilePictureUrl={user.profile_picture_url}
@@ -1098,7 +1586,7 @@ function MessageItem({
                     </UserPopover>
 
                     <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex items-center gap-2">
+                        <div className="flex items-center gap-2">
                             <UserPopover
                                 user={user}
                                 currentUserId={currentUserId}

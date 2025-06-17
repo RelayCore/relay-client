@@ -169,6 +169,15 @@ export interface ServerConfigUpdatedBroadcast {
     max_attachments: number;
 }
 
+export interface UserTaggedBroadcast {
+    message_id: number;
+    channel_id: number;
+    tagger_id: string;
+    tagger_username: string;
+    tagger_nickname: string;
+    tagged_at: string;
+}
+
 export const MESSAGE_TYPES = {
     // Connection and user status
     ONLINE_USERS: "online_users",
@@ -180,6 +189,7 @@ export const MESSAGE_TYPES = {
     MESSAGE_EDITED: "message_edited",
     MESSAGE_PINNED: "message_pinned",
     MESSAGE_UNPINNED: "message_unpinned",
+    USER_TAGGED: "user_tagged",
 
     // Channel events
     GROUP_CREATED: "group_created",
