@@ -2,7 +2,7 @@ import React from "react";
 import { cn } from "@/utils/tailwind";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Paperclip, Download, ExternalLink, X } from "lucide-react";
+import { Paperclip, Download, ExternalLink, X, Star } from "lucide-react";
 import {
     Message,
     Attachment,
@@ -30,6 +30,10 @@ import { MentionsPopup } from "./mention-popup";
 import { toast } from "sonner";
 import { cacheManager } from "@/utils/cache-manager";
 import { downloadFile } from "@/utils/assets";
+import {
+    getLocalStorageItem,
+    updateLocalStorageItem,
+} from "@/utils/localstorage";
 import { MessageItem } from "./message-channel/message-item";
 import { MessageContentProcessor } from "./message-channel/message-content-processor";
 import { motion, AnimatePresence } from "framer-motion";
@@ -101,6 +105,7 @@ export default function MessageChannel({
         number | null
     >(null);
     const [editingText, setEditingText] = React.useState("");
+    const [starredImages, setStarredImages] = React.useState<string[]>([]);
 
     const [mentionPopupOpen, setMentionPopupOpen] = React.useState(false);
     const [mentionSearchQuery, setMentionSearchQuery] = React.useState("");
@@ -898,6 +903,42 @@ export default function MessageChannel({
         return parseMessageForDisplay(messageText);
     }, [messageText, parseMessageForDisplay]);
 
+    // Load starred images from localStorage on mount
+    React.useEffect(() => {
+        const stored = getLocalStorageItem("starred-images") || [];
+        setStarredImages(stored);
+    }, []);
+
+    const handleStarImage = React.useCallback(
+        (imageUrl: string) => {
+            const isCurrentlyStarred = starredImages.includes(imageUrl);
+
+            updateLocalStorageItem("starred-images", (current) => {
+                const currentArray = current || [];
+                if (isCurrentlyStarred) {
+                    return currentArray.filter((url) => url !== imageUrl);
+                } else {
+                    return [...currentArray, imageUrl];
+                }
+            });
+
+            setStarredImages((prev) => {
+                if (isCurrentlyStarred) {
+                    return prev.filter((url) => url !== imageUrl);
+                } else {
+                    return [...prev, imageUrl];
+                }
+            });
+
+            toast.success(
+                isCurrentlyStarred
+                    ? "Removed from starred images"
+                    : "Added to starred images",
+            );
+        },
+        [starredImages],
+    );
+
     if (loading) {
         return <MessageChannelSkeleton />;
     }
@@ -1025,6 +1066,39 @@ export default function MessageChannel({
                                 {formatFileSize(openedImage.file_size)})
                             </div>
                             <div className="flex flex-shrink-0 gap-2">
+                                <Button
+                                    size="icon"
+                                    variant="secondary"
+                                    className={cn(
+                                        "h-8 w-8",
+                                        starredImages.includes(
+                                            openedImage.file_path,
+                                        ) &&
+                                            "bg-yellow-500 text-yellow-50 hover:bg-yellow-600",
+                                    )}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleStarImage(openedImage.file_path);
+                                    }}
+                                    title={
+                                        starredImages.includes(
+                                            openedImage.file_path,
+                                        )
+                                            ? "Remove from starred"
+                                            : "Add to starred"
+                                    }
+                                >
+                                    <Star
+                                        size={16}
+                                        className={
+                                            starredImages.includes(
+                                                openedImage.file_path,
+                                            )
+                                                ? "fill-current"
+                                                : ""
+                                        }
+                                    />
+                                </Button>
                                 <Button
                                     size="icon"
                                     variant="secondary"

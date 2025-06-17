@@ -7,7 +7,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
-import { Search, Loader2, TrendingUp, Paperclip } from "lucide-react";
+import { Search, Loader2, TrendingUp, Paperclip, Star } from "lucide-react";
 import {
     tenorSearch,
     tenorTrending,
@@ -17,13 +17,14 @@ import {
 } from "@/api/server";
 import { useServer } from "@/contexts/server-context";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { getLocalStorageItem } from "@/utils/localstorage";
 
 interface GifPopupProps {
     onGifSelect: (gifUrl: string) => void;
     children: React.ReactNode;
 }
 
-type ViewMode = "trending" | "search" | "attachments";
+type ViewMode = "trending" | "search" | "attachments" | "starred";
 
 export const GifPopup = React.memo(function GifPopup({
     onGifSelect,
@@ -38,6 +39,7 @@ export const GifPopup = React.memo(function GifPopup({
     const [attachments, setAttachments] = React.useState<
         AttachmentApiResponse[]
     >([]);
+    const [starredImages, setStarredImages] = React.useState<string[]>([]);
     const [loading, setLoading] = React.useState(true);
     const searchTimeout = React.useRef<NodeJS.Timeout | null>(null);
     const scrollRef = React.useRef<HTMLDivElement | null>(null);
@@ -106,6 +108,26 @@ export const GifPopup = React.memo(function GifPopup({
         }
     }, [serverRecord?.server_url, userId, open, viewMode]);
 
+    // Load starred images when viewMode changes to starred
+    React.useEffect(() => {
+        const loadStarredImages = () => {
+            setLoading(true);
+            try {
+                const stored = getLocalStorageItem("starred-images") || [];
+                setStarredImages(stored);
+            } catch (error) {
+                console.error("Failed to load starred images:", error);
+                setStarredImages([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (open && viewMode === "starred") {
+            loadStarredImages();
+        }
+    }, [open, viewMode]);
+
     // Handle search
     React.useEffect(() => {
         const performSearch = async () => {
@@ -172,6 +194,11 @@ export const GifPopup = React.memo(function GifPopup({
         setOpen(false);
     };
 
+    const handleStarredImageClick = (imageUrl: string) => {
+        onGifSelect(imageUrl);
+        setOpen(false);
+    };
+
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>{children}</PopoverTrigger>
@@ -194,6 +221,7 @@ export const GifPopup = React.memo(function GifPopup({
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="h-10 pl-10 text-base"
+                                disabled={viewMode === "starred"}
                             />
                         </div>
                     </div>
@@ -235,6 +263,23 @@ export const GifPopup = React.memo(function GifPopup({
                                 <Paperclip size={16} className="mr-1.5" />
                                 Attachments
                             </Button>
+                            <Button
+                                variant={
+                                    viewMode === "starred"
+                                        ? "secondary"
+                                        : "outline"
+                                }
+                                size="sm"
+                                className="h-8"
+                                onClick={() => {
+                                    setViewMode("starred");
+                                    setSearchQuery("");
+                                }}
+                                title="Starred Images"
+                            >
+                                <Star size={16} className="mr-1.5" />
+                                Starred
+                            </Button>
                         </div>
                     </div>
 
@@ -257,10 +302,66 @@ export const GifPopup = React.memo(function GifPopup({
                                             Loading{" "}
                                             {viewMode === "attachments"
                                                 ? "attachments"
-                                                : "GIFs"}
+                                                : viewMode === "starred"
+                                                  ? "starred images"
+                                                  : "GIFs"}
                                             ...
                                         </p>
                                     </div>
+                                ) : viewMode === "starred" ? (
+                                    starredImages.length === 0 ? (
+                                        <div className="text-muted-foreground py-20 text-center text-base">
+                                            <Star
+                                                size={32}
+                                                className="mx-auto mb-2 opacity-50"
+                                            />
+                                            <p>No starred images yet.</p>
+                                            <p className="mt-1 text-sm">
+                                                Star images by clicking the star
+                                                icon when viewing them.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-4 gap-3">
+                                            {starredImages.map(
+                                                (imageUrl, index) => (
+                                                    <div
+                                                        key={`starred-${index}-${imageUrl}`}
+                                                        className="group relative overflow-hidden rounded-lg"
+                                                        onClick={() =>
+                                                            handleStarredImageClick(
+                                                                imageUrl,
+                                                            )
+                                                        }
+                                                    >
+                                                        <div className="bg-muted relative cursor-pointer overflow-hidden rounded-md">
+                                                            <img
+                                                                src={imageUrl}
+                                                                alt="Starred image"
+                                                                className="block h-auto w-full hover:opacity-90"
+                                                                loading="lazy"
+                                                                onError={(
+                                                                    e,
+                                                                ) => {
+                                                                    // Hide broken images
+                                                                    const target =
+                                                                        e.target as HTMLElement;
+                                                                    target.style.display =
+                                                                        "none";
+                                                                }}
+                                                            />
+                                                            <div className="absolute top-1 right-1 opacity-0 transition-opacity group-hover:opacity-100">
+                                                                <Star
+                                                                    size={12}
+                                                                    className="fill-yellow-400 text-yellow-400"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ),
+                                            )}
+                                        </div>
+                                    )
                                 ) : viewMode === "attachments" ? (
                                     attachments.length === 0 ? (
                                         <div className="text-muted-foreground py-20 text-center text-base">
