@@ -31,7 +31,6 @@ import { toast } from "sonner";
 import { cacheManager } from "@/utils/cache-manager";
 import { downloadFile } from "@/utils/assets";
 import { MessageItem } from "./message-channel/message-item";
-// import { ProcessedMessageContent } from "./message-channel/message-content"; // This import is now in MessageInput
 import { MessageContentProcessor } from "./message-channel/message-content-processor";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageInput } from "./message-channel/message-input";
