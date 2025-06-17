@@ -168,6 +168,8 @@ export interface ServerConfigUpdatedBroadcast {
     allow_invite: boolean;
     max_users: number;
     max_attachments: number;
+    max_file_size: number; // MB
+    tenor_enabled: boolean;
 }
 
 export interface UserTaggedBroadcast {

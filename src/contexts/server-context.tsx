@@ -734,6 +734,8 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                         allow_invite: configData.allow_invite,
                         max_users: configData.max_users,
                         max_attachments: configData.max_attachments,
+                        max_file_size: configData.max_file_size,
+                        tenor_enabled: configData.tenor_enabled,
                     });
                     toast.success("Server configuration updated");
                     break;
