@@ -191,7 +191,7 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
             setChannelGroups(channelsResponse.groups);
 
             // Select first channel if none selected
-            if (!selectedChannelId && channelsResponse.groups.length > 0) {
+            if (channelsResponse.groups.length > 0) {
                 const firstChannel = channelsResponse.groups[0]?.channels[0];
                 if (firstChannel) {
                     setSelectedChannelId(firstChannel.id);
@@ -212,7 +212,7 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         } finally {
             setLoading(false);
         }
-    }, [userId, selectedChannelId]);
+    }, [userId]);
 
     // Load data when userId changes
     React.useEffect(() => {
