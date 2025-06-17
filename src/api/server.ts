@@ -1085,3 +1085,76 @@ export async function tenorCategories(
         method: "GET",
     });
 }
+
+export interface AttachmentApiResponse {
+    id: number;
+    type: AttachmentType;
+    file_name: string;
+    file_size: number;
+    file_path: string;
+    mime_type: string;
+    file_hash: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface GetAllAttachmentsRequest {
+    limit?: number;
+    offset?: number;
+    type?: AttachmentType;
+}
+
+export interface GetAllAttachmentsResponse {
+    attachments: AttachmentApiResponse[];
+    total: number;
+    count: number;
+    limit: number;
+    offset: number;
+}
+
+export interface AttachmentTypeStats {
+    count: number;
+    size: number;
+}
+
+export interface GetAttachmentStatsResponse {
+    total_attachments: number;
+    total_size: number;
+    by_type: Record<AttachmentType, AttachmentTypeStats>;
+}
+
+// Get all attachments with pagination and optional type filter
+export async function getAllAttachments(
+    serverUrl: string,
+    userId: string,
+    request?: GetAllAttachmentsRequest,
+): Promise<GetAllAttachmentsResponse> {
+    const params = new URLSearchParams();
+
+    if (request?.limit !== undefined) {
+        params.append("limit", request.limit.toString());
+    }
+
+    if (request?.offset !== undefined) {
+        params.append("offset", request.offset.toString());
+    }
+
+    if (request?.type) {
+        params.append("type", request.type);
+    }
+
+    const endpoint = `/attachments${params.toString() ? `?${params.toString()}` : ""}`;
+    return apiRequest<GetAllAttachmentsResponse>(serverUrl, endpoint, userId);
+}
+
+// Get attachment statistics
+export async function getAttachmentStats(
+    serverUrl: string,
+    userId: string,
+): Promise<GetAttachmentStatsResponse> {
+    return apiRequest<GetAttachmentStatsResponse>(
+        serverUrl,
+        "/attachments/stats",
+        userId,
+    );
+}
