@@ -31,11 +31,15 @@ import { Toaster } from "@/components/ui/sonner";
 import { ConfirmProvider } from "@/contexts/confirm-context";
 import { DevContextMenu } from "@/components/dev/dev-context-menu";
 import { platform } from "@/platform";
-import { loadServers, ServerRecord } from "@/storage/server-store";
+import { loadServers, ServerRecord, saveServers } from "@/storage/server-store";
 import { ServerProvider } from "@/contexts/server-context";
 import { webSocketManager } from "@/websocket/websocket-manager";
 import { JoinServerDialog } from "@/components/server/join-server-dialog";
 import { getServerInfo, ServerInfo } from "@/api/server";
+// @ts-expect-error - Ignoring ESM/CommonJS module warning
+import { DndProvider, useDrag, useDrop } from "react-dnd";
+// @ts-expect-error - Ignoring ESM/CommonJS module warning
+import { HTML5Backend } from "react-dnd-html5-backend";
 
 interface ServerStatus {
     online: boolean;
@@ -64,6 +68,157 @@ function removeTextSelection() {
             selection.removeAllRanges();
         }
     }
+}
+
+interface DragItem {
+    type: string;
+    index: number;
+    serverId: string;
+}
+
+interface DraggableServerItemProps {
+    server: ServerRecord;
+    index: number;
+    moveServer: (dragIndex: number, hoverIndex: number) => void;
+    isServerAccessible: (server: ServerRecord) => boolean;
+    getServerDisplayName: (server: ServerRecord) => string;
+    serverStatuses: Map<string, ServerStatus>;
+    router: ReturnType<typeof useRouter>;
+    navigate: ReturnType<typeof useNavigate>;
+}
+
+function DraggableServerItem({
+    server,
+    index,
+    moveServer,
+    isServerAccessible,
+    getServerDisplayName,
+    serverStatuses,
+    router,
+    navigate,
+}: DraggableServerItemProps) {
+    const ref = React.useRef<HTMLLIElement>(null);
+
+    const [{ handlerId }, drop] = useDrop<
+        DragItem,
+        void,
+        { handlerId: unknown }
+    >({
+        accept: "server",
+        collect: (monitor) => ({
+            handlerId: monitor.getHandlerId(),
+        }),
+        hover(item, monitor) {
+            if (!ref.current) {
+                return;
+            }
+            const dragIndex = item.index;
+            const hoverIndex = index;
+
+            if (dragIndex === hoverIndex) {
+                return;
+            }
+
+            const hoverBoundingRect = ref.current?.getBoundingClientRect();
+            const hoverMiddleY =
+                (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
+            const clientOffset = monitor.getClientOffset();
+            const hoverClientY = clientOffset!.y - hoverBoundingRect.top;
+
+            if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) {
+                return;
+            }
+
+            if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) {
+                return;
+            }
+
+            moveServer(dragIndex, hoverIndex);
+            item.index = hoverIndex;
+        },
+    });
+
+    const [{ isDragging }, drag, preview] = useDrag({
+        type: "server",
+        item: () => {
+            return { serverId: server.user_id, index };
+        },
+        collect: (monitor) => ({
+            isDragging: monitor.isDragging(),
+        }),
+    });
+
+    const accessible = isServerAccessible(server);
+    const displayName = getServerDisplayName(server);
+    const status = serverStatuses.get(server.user_id);
+    const serverIcon = status?.metadata?.icon;
+
+    preview(drop(ref));
+
+    return (
+        <SidebarMenuItem
+            ref={ref}
+            data-handler-id={handlerId}
+            className={isDragging ? "opacity-50" : ""}
+        >
+            <div
+                ref={(node) => {
+                    drag(node);
+                }}
+            >
+                <SidebarMenuButton
+                    tooltip={`${displayName}${
+                        accessible
+                            ? ""
+                            : status?.online
+                              ? " (Connecting...)"
+                              : " (Offline)"
+                    }`}
+                    onClick={() => {
+                        if (accessible) {
+                            navigate({
+                                to: `/servers/${server.user_id}`,
+                            });
+                        }
+                    }}
+                    isActive={
+                        router.state.location.pathname ===
+                        `/servers/${server.user_id}`
+                    }
+                    className={`${
+                        !accessible
+                            ? "cursor-not-allowed opacity-50"
+                            : "cursor-pointer"
+                    }`}
+                    disabled={!accessible}
+                >
+                    <div className="relative">
+                        {serverIcon ? (
+                            <img
+                                src={serverIcon}
+                                alt={`${displayName} icon`}
+                                className="h-6 w-6 min-w-6 rounded object-cover"
+                                onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = "none";
+                                    target.nextElementSibling?.classList.remove(
+                                        "hidden",
+                                    );
+                                }}
+                            />
+                        ) : null}
+                        <ServerIcon
+                            className={`min-w-6 ${serverIcon ? "hidden" : ""}`}
+                        />
+                        {!accessible && (
+                            <div className="bg-destructive absolute -right-1 -bottom-1 h-2 w-2 rounded-full" />
+                        )}
+                    </div>
+                    <span className="truncate">{displayName}</span>
+                </SidebarMenuButton>
+            </div>
+        </SidebarMenuItem>
+    );
 }
 
 function BaseLayoutContent({
@@ -383,6 +538,28 @@ function BaseLayoutContent({
         [serverStatuses, connectionStates],
     );
 
+    const moveServer = React.useCallback(
+        async (dragIndex: number, hoverIndex: number) => {
+            const newServers = [...servers];
+            const draggedServer = newServers[dragIndex];
+
+            newServers.splice(dragIndex, 1);
+            newServers.splice(hoverIndex, 0, draggedServer);
+
+            setServers(newServers);
+
+            // Persist the new order
+            try {
+                await saveServers(newServers);
+                window.dispatchEvent(new CustomEvent("servers-updated"));
+            } catch (error) {
+                console.error("Failed to save server order:", error);
+                setServers(servers);
+            }
+        },
+        [servers],
+    );
+
     return (
         <div className="flex h-screen flex-col">
             <DragSelection />
@@ -415,89 +592,40 @@ function BaseLayoutContent({
             <div className="bg-sidebar flex flex-1 overflow-hidden">
                 <Sidebar collapsible="icon">
                     <SidebarContent>
-                        <SidebarMenu className="relative bottom-0.5 p-2">
-                            <SidebarMenuItem>
-                                <SidebarMenuButton
-                                    tooltip="Home"
-                                    onClick={() => navigate({ to: "/" })}
-                                    isActive={
-                                        router.state.location.pathname === "/"
-                                    }
-                                >
-                                    <HomeIcon />
-                                    <span>Home</span>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            {servers.map((server) => {
-                                const accessible = isServerAccessible(server);
-                                const displayName =
-                                    getServerDisplayName(server);
-                                const status = serverStatuses.get(
-                                    server.user_id,
-                                );
-                                const serverIcon = status?.metadata?.icon;
-
-                                return (
-                                    <SidebarMenuItem key={server.user_id}>
-                                        <SidebarMenuButton
-                                            tooltip={`${displayName}${
-                                                accessible
-                                                    ? ""
-                                                    : status?.online
-                                                      ? " (Connecting...)"
-                                                      : " (Offline)"
-                                            }`}
-                                            onClick={() => {
-                                                if (accessible) {
-                                                    navigate({
-                                                        to: `/servers/${server.user_id}`,
-                                                    });
-                                                }
-                                            }}
-                                            isActive={
-                                                router.state.location
-                                                    .pathname ===
-                                                `/servers/${server.user_id}`
-                                            }
-                                            className={
-                                                !accessible
-                                                    ? "cursor-not-allowed opacity-50"
-                                                    : ""
-                                            }
-                                            disabled={!accessible}
-                                        >
-                                            <div className="relative">
-                                                {serverIcon ? (
-                                                    <img
-                                                        src={serverIcon}
-                                                        alt={`${displayName} icon`}
-                                                        className="h-6 w-6 min-w-6 rounded object-cover"
-                                                        onError={(e) => {
-                                                            const target =
-                                                                e.target as HTMLImageElement;
-                                                            target.style.display =
-                                                                "none";
-                                                            target.nextElementSibling?.classList.remove(
-                                                                "hidden",
-                                                            );
-                                                        }}
-                                                    />
-                                                ) : null}
-                                                <ServerIcon
-                                                    className={`min-w-6 ${serverIcon ? "hidden" : ""}`}
-                                                />
-                                                {!accessible && (
-                                                    <div className="bg-destructive absolute -right-1 -bottom-1 h-2 w-2 rounded-full" />
-                                                )}
-                                            </div>
-                                            <span className="truncate">
-                                                {displayName}
-                                            </span>
-                                        </SidebarMenuButton>
-                                    </SidebarMenuItem>
-                                );
-                            })}
-                        </SidebarMenu>
+                        <DndProvider backend={HTML5Backend}>
+                            <SidebarMenu className="relative bottom-0.5 p-2">
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton
+                                        tooltip="Home"
+                                        onClick={() => navigate({ to: "/" })}
+                                        isActive={
+                                            router.state.location.pathname ===
+                                            "/"
+                                        }
+                                    >
+                                        <>
+                                            <HomeIcon />
+                                            <span>Home</span>
+                                        </>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                                {servers.map((server, index) => (
+                                    <DraggableServerItem
+                                        key={server.user_id}
+                                        server={server}
+                                        index={index}
+                                        moveServer={moveServer}
+                                        isServerAccessible={isServerAccessible}
+                                        getServerDisplayName={
+                                            getServerDisplayName
+                                        }
+                                        serverStatuses={serverStatuses}
+                                        router={router}
+                                        navigate={navigate}
+                                    />
+                                ))}
+                            </SidebarMenu>
+                        </DndProvider>
                     </SidebarContent>
                     <SidebarFooter>
                         <SidebarMenuItem>
