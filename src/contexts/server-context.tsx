@@ -55,6 +55,7 @@ interface ServerContextState {
     selectedChannelId: number | null;
     selectedVoiceChannelId: number | null;
     showMembers: boolean;
+    goToMessageId: number | null; // Add this for message navigation
 
     // Loading states
     loading: boolean;
@@ -72,6 +73,7 @@ interface ServerContextState {
     getSelectedVoiceChannel: () => Channel | null;
     getUserById: (userId: string) => User | null;
     isChannelUnread: (channelId: number) => boolean;
+    goToMessage: (channelId: number, messageId: number) => void; // Add this function
 }
 
 const ServerContext = React.createContext<ServerContextState | null>(null);
@@ -99,6 +101,9 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
     const [showMembers, setShowMembers] = React.useState(true);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState<Error | null>(null);
+    const [goToMessageId, setGoToMessageId] = React.useState<number | null>(
+        null,
+    );
 
     // Derive server info from server record and cached metadata
     const serverInfo = React.useMemo((): ServerInfo | null => {
@@ -786,6 +791,23 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         window.location.href = "/";
     }, [userId, serverRecord, clearServerStatusCache]);
 
+    // Go to message function
+    const goToMessage = React.useCallback(
+        (channelId: number, messageId: number) => {
+            // Switch to the target channel if different
+            if (selectedChannelId !== channelId) {
+                setSelectedChannelId(channelId);
+            }
+
+            // Set the message ID to navigate to
+            setGoToMessageId(messageId);
+
+            // Clear the message ID after a short delay to allow the component to handle it
+            setTimeout(() => setGoToMessageId(null), 100);
+        },
+        [selectedChannelId],
+    );
+
     const contextValue: ServerContextState = {
         serverRecord,
         serverInfo,
@@ -795,6 +817,7 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         selectedChannelId,
         selectedVoiceChannelId,
         showMembers,
+        goToMessageId,
         loading,
         error,
         setSelectedChannelId,
@@ -808,6 +831,7 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         getSelectedVoiceChannel,
         getUserById,
         isChannelUnread: isChannelUnreadHelper,
+        goToMessage,
     };
 
     return (
@@ -835,23 +859,27 @@ export function useChannels() {
         channelGroups,
         selectedChannelId,
         selectedVoiceChannelId,
+        goToMessageId,
         setSelectedChannelId,
         setSelectedVoiceChannelId,
         setChannelGroups,
         refreshServerData,
         getSelectedChannel,
         getSelectedVoiceChannel,
+        goToMessage,
     } = useServer();
     return {
         channelGroups,
         selectedChannelId,
         selectedVoiceChannelId,
+        goToMessageId,
         setSelectedChannelId,
         setSelectedVoiceChannelId,
         setChannelGroups,
         refreshServerData,
         getSelectedChannel,
         getSelectedVoiceChannel,
+        goToMessage,
     };
 }
 

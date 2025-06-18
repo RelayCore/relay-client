@@ -8,6 +8,7 @@ import {
     Attachment,
     formatFileSize,
     getChannelMessages,
+    getMessagesAround,
     sendMessageWithAttachments,
     Channel,
     canWriteToChannel,
@@ -45,6 +46,7 @@ export interface MessageChannelProps {
     currentUserId?: string;
     serverUrl: string;
     className?: string;
+    goToMessageId?: number; // Add this prop for external navigation
 }
 
 const isSameDay = (date1: Date, date2: Date): boolean => {
@@ -82,6 +84,7 @@ export default function MessageChannel({
     currentUserId,
     serverUrl,
     className,
+    goToMessageId, // Add this prop
 }: MessageChannelProps) {
     const [messageText, setMessageText] = React.useState("");
     const [messages, setMessages] = React.useState<Message[]>([]);
@@ -107,6 +110,11 @@ export default function MessageChannel({
     const [editingText, setEditingText] = React.useState("");
     const [replyingTo, setReplyingTo] = React.useState<Message | null>(null);
     const [starredImages, setStarredImages] = React.useState<string[]>([]);
+    const [highlightedMessageId, setHighlightedMessageId] = React.useState<
+        number | null
+    >(null);
+    const [loadingMessageAround, setLoadingMessageAround] =
+        React.useState<boolean>(false);
 
     const [mentionPopupOpen, setMentionPopupOpen] = React.useState(false);
     const [mentionSearchQuery, setMentionSearchQuery] = React.useState("");
@@ -951,6 +959,92 @@ export default function MessageChannel({
         [starredImages],
     );
 
+    // Go to message function
+    const goToMessage = React.useCallback(
+        async (messageId: number) => {
+            if (!currentUserId) return;
+
+            // Check if message already exists in current messages
+            const existingMessage = messages.find(
+                (msg) => msg.id === messageId,
+            );
+
+            if (existingMessage) {
+                // Message exists, just scroll to it
+                const messageElement = document.getElementById(
+                    `message-${messageId}`,
+                );
+                if (messageElement) {
+                    messageElement.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center",
+                    });
+
+                    // Highlight the message
+                    setHighlightedMessageId(messageId);
+                    setTimeout(() => setHighlightedMessageId(null), 3000);
+                }
+                return;
+            }
+
+            // Message doesn't exist, load messages around it
+            setLoadingMessageAround(true);
+            try {
+                const response = await getMessagesAround(
+                    serverUrl,
+                    currentUserId,
+                    channelId,
+                    messageId,
+                    25, // Load 25 messages before and after
+                );
+
+                const sortedMessages = response.messages.sort(
+                    (a, b) =>
+                        new Date(a.created_at).getTime() -
+                        new Date(b.created_at).getTime(),
+                );
+
+                // Replace current messages with the new context
+                setMessages(sortedMessages);
+                cacheManager.setMessages(
+                    currentUserId,
+                    channelId,
+                    sortedMessages,
+                );
+
+                // Wait a bit for render, then scroll to the target message
+                setTimeout(() => {
+                    const messageElement = document.getElementById(
+                        `message-${messageId}`,
+                    );
+                    if (messageElement) {
+                        messageElement.scrollIntoView({
+                            behavior: "smooth",
+                            block: "center",
+                        });
+
+                        // Highlight the message
+                        setHighlightedMessageId(messageId);
+                        setTimeout(() => setHighlightedMessageId(null), 3000);
+                    }
+                }, 100);
+            } catch (error) {
+                console.error("Failed to load messages around target:", error);
+                toast.error("Failed to load message");
+            } finally {
+                setLoadingMessageAround(false);
+            }
+        },
+        [currentUserId, serverUrl, channelId, messages],
+    );
+
+    // Handle external navigation via props
+    React.useEffect(() => {
+        if (goToMessageId) {
+            goToMessage(goToMessageId);
+        }
+    }, [goToMessageId, goToMessage]);
+
     if (loading) {
         return <MessageChannelSkeleton />;
     }
@@ -1207,6 +1301,18 @@ export default function MessageChannel({
                 )}
             </AnimatePresence>
 
+            {/* Loading overlay for go-to-message */}
+            {loadingMessageAround && (
+                <div className="bg-background/80 absolute inset-0 z-40 flex items-center justify-center backdrop-blur-sm">
+                    <div className="bg-background flex items-center gap-2 rounded-lg border p-4 shadow-lg">
+                        <div className="border-primary h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
+                        <span className="text-sm font-medium">
+                            Loading message...
+                        </span>
+                    </div>
+                </div>
+            )}
+
             <div
                 ref={messagesContainerRef}
                 className="min-h-0 flex-grow overflow-auto px-3 py-3"
@@ -1246,20 +1352,34 @@ export default function MessageChannel({
                                 !prevMessageDate ||
                                 !isSameDay(currentMessageDate, prevMessageDate);
 
+                            const isHighlighted =
+                                highlightedMessageId === message.id;
+
                             const messageElement = (
-                                <MessageItem
-                                    message={message}
-                                    showHeader={showHeader}
-                                    currentUserId={currentUserId}
-                                    onImageClick={handleImageClick}
-                                    isEditing={editingMessageId === message.id}
-                                    editingText={editingText}
-                                    onEditingTextChange={setEditingText}
-                                    onEditSave={handleEditSave}
-                                    onEditCancel={handleEditCancel}
-                                    onReply={handleReply}
-                                    onContentLoad={scrollToBottom}
-                                />
+                                <div
+                                    id={`message-${message.id}`}
+                                    className={cn(
+                                        "rounded-lg transition-colors duration-300",
+                                        isHighlighted && "bg-primary/10",
+                                    )}
+                                >
+                                    <MessageItem
+                                        message={message}
+                                        showHeader={showHeader}
+                                        currentUserId={currentUserId}
+                                        onImageClick={handleImageClick}
+                                        isEditing={
+                                            editingMessageId === message.id
+                                        }
+                                        editingText={editingText}
+                                        onEditingTextChange={setEditingText}
+                                        onEditSave={handleEditSave}
+                                        onEditCancel={handleEditCancel}
+                                        onReply={handleReply}
+                                        onContentLoad={scrollToBottom}
+                                        goToMessage={goToMessage}
+                                    />
+                                </div>
                             );
 
                             return (

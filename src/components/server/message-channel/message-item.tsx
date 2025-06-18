@@ -67,6 +67,7 @@ export function MessageItem({
     onEditCancel,
     onReply,
     onContentLoad,
+    goToMessage,
 }: {
     message: Message;
     showHeader?: boolean;
@@ -82,6 +83,7 @@ export function MessageItem({
     onEditCancel?: () => void;
     onReply?: (message: Message) => void;
     onContentLoad?: () => void;
+    goToMessage?: (messageId: number) => void;
 }) {
     const { users } = useMembers();
     const formattedDate = formatMessageDate(message.created_at);
@@ -275,6 +277,7 @@ export function MessageItem({
                         replyToMessage={message.reply_to_message}
                         isCompact={true}
                         className="ml-0"
+                        goToMessage={goToMessage}
                     />
                 )}
 

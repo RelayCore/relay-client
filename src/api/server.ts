@@ -306,6 +306,14 @@ interface ClientMetadata {
     timestamp: string;
 }
 
+export interface GetMessagesAroundResponse {
+    messages: Message[];
+    target_message: number;
+    count: number;
+    messages_before: number;
+    messages_after: number;
+}
+
 function getClientMetadata(): ClientMetadata {
     return {
         client_name: APP_CONFIG.protocolName,
@@ -386,6 +394,18 @@ export async function getChannelMessages(
         endpoint,
         userId,
     );
+}
+
+// Get messages around a specific message
+export async function getMessagesAround(
+    serverUrl: string,
+    userId: string,
+    channelId: number,
+    messageId: number,
+    limit: number = 25,
+): Promise<GetMessagesAroundResponse> {
+    const endpoint = `/channels/messages/around?channel_id=${channelId}&message_id=${messageId}&limit=${limit}`;
+    return apiRequest<GetMessagesAroundResponse>(serverUrl, endpoint, userId);
 }
 
 // Get all users
