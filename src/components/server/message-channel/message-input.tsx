@@ -11,12 +11,13 @@ import {
     FileText,
     ImagePlay,
 } from "lucide-react";
-import { formatFileSize } from "@/api/server";
+import { formatFileSize, Message } from "@/api/server";
 import { EmojiPopup } from "../emoji-popup";
 import { ProcessedMessageContent } from "./message-content";
 import { MessageContentPart } from "./message-content-processor";
 import { useServer } from "@/contexts/server-context";
 import { GifPopup } from "./gif-popup";
+import { ReplyPreview } from "./reply-preview";
 
 interface MessageInputProps {
     messageText: string;
@@ -38,6 +39,8 @@ interface MessageInputProps {
     currentUserId?: string;
     textareaRef: React.RefObject<HTMLTextAreaElement | null>;
     fileInputRef: React.RefObject<HTMLInputElement | null>;
+    replyingTo?: Message | null;
+    onCancelReply?: () => void;
 }
 
 export function MessageInput({
@@ -60,6 +63,8 @@ export function MessageInput({
     currentUserId,
     textareaRef,
     fileInputRef,
+    replyingTo,
+    onCancelReply,
 }: MessageInputProps) {
     const { serverInfo } = useServer();
     const getFileKey = (file: File) =>
@@ -73,6 +78,22 @@ export function MessageInput({
                 "min-h-16 flex-shrink-0 content-center border-t px-3 py-2"
             }
         >
+            {replyingTo && (
+                <div className="px-3 pt-3">
+                    <ReplyPreview
+                        replyToMessage={{
+                            id: replyingTo.id,
+                            author_id: replyingTo.author_id,
+                            content: replyingTo.content,
+                            created_at: replyingTo.created_at,
+                            username: replyingTo.username,
+                            nickname: replyingTo.nickname || "",
+                        }}
+                        onCancel={onCancelReply}
+                    />
+                </div>
+            )}
+
             {/* File Attachments Preview */}
             {selectedFiles.length > 0 && (
                 <div className="mb-3 flex flex-wrap gap-2">

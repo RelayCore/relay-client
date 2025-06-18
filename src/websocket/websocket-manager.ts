@@ -2,23 +2,14 @@ import { ServerRecord } from "@/storage/server-store";
 import { VoiceClient, VoiceEventData } from "@/api/voice";
 import { toast } from "sonner";
 import { inDevelopment } from "@/config";
-import { Attachment, Permission } from "@/api/server";
+import { Attachment, Message, Permission } from "@/api/server";
 
 export interface WebSocketMessage {
     type: string;
     data: unknown;
 }
 
-export interface MessageBroadcast {
-    id: number;
-    channel_id: number;
-    author_id: string;
-    content: string;
-    created_at: string;
-    updated_at: string;
-    username?: string;
-    nickname?: string;
-}
+export type MessageBroadcast = Message;
 
 export interface OnlineUsersData {
     online_users: string[];
@@ -181,6 +172,17 @@ export interface UserTaggedBroadcast {
     tagged_at: string;
 }
 
+export interface MessageReplyBroadcast {
+    message_id: number;
+    reply_to_message_id: number;
+    channel_id: number;
+    replier_id: string;
+    replier_username: string;
+    replier_nickname: string;
+    reply_content: string;
+    replied_at: string;
+}
+
 export const MESSAGE_TYPES = {
     // Connection and user status
     ONLINE_USERS: "online_users",
@@ -188,6 +190,7 @@ export const MESSAGE_TYPES = {
 
     // Message events
     MESSAGE_BROADCAST: "new_message",
+    MESSAGE_REPLY: "message_reply",
     MESSAGE_DELETED: "message_deleted",
     MESSAGE_EDITED: "message_edited",
     MESSAGE_PINNED: "message_pinned",

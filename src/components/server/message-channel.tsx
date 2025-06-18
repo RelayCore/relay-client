@@ -105,6 +105,7 @@ export default function MessageChannel({
         number | null
     >(null);
     const [editingText, setEditingText] = React.useState("");
+    const [replyingTo, setReplyingTo] = React.useState<Message | null>(null);
     const [starredImages, setStarredImages] = React.useState<string[]>([]);
 
     const [mentionPopupOpen, setMentionPopupOpen] = React.useState(false);
@@ -202,17 +203,7 @@ export default function MessageChannel({
                 case MESSAGE_TYPES.MESSAGE_BROADCAST: {
                     const messageData = message.data as MessageBroadcast;
                     if (messageData.channel_id === channelId) {
-                        const newMessage: Message = {
-                            id: messageData.id,
-                            channel_id: messageData.channel_id,
-                            author_id: messageData.author_id,
-                            username: messageData.username || "",
-                            content: messageData.content,
-                            created_at: messageData.created_at,
-                            updated_at: messageData.updated_at || "",
-                            attachments: [],
-                            pinned: false,
-                        };
+                        const newMessage: Message = messageData;
 
                         setMessages((prev) => {
                             if (prev.some((msg) => msg.id === newMessage.id)) {
@@ -375,7 +366,8 @@ export default function MessageChannel({
 
         // Store the current message and files before clearing
         const messageToSend = messageText.trim();
-        const filesToSend = [...selectedFiles]; // Create a copy
+        const filesToSend = [...selectedFiles];
+        const replyToId = replyingTo?.id;
 
         // Set sending state immediately to prevent duplicate calls
         setSending(true);
@@ -384,6 +376,7 @@ export default function MessageChannel({
             // Clear the input and files after setting sending state
             setMessageText("");
             setSelectedFiles([]);
+            setReplyingTo(null); // Clear reply
             filePreviewUrls.forEach((url) => URL.revokeObjectURL(url));
             setFilePreviewUrls(new Map());
 
@@ -393,12 +386,20 @@ export default function MessageChannel({
                 channelId,
                 messageToSend,
                 filesToSend.length > 0 ? filesToSend : undefined,
+                replyToId,
             );
         } catch (err) {
             console.error("Failed to send message:", err);
             // Restore the message and files on error
             setMessageText(messageToSend);
             setSelectedFiles(filesToSend);
+            if (replyToId) {
+                // Restore reply state if it was set
+                const replyMessage = messages.find((m) => m.id === replyToId);
+                if (replyMessage) {
+                    setReplyingTo(replyMessage);
+                }
+            }
 
             // Recreate file preview URLs
             const newUrls = new Map<string, string>();
@@ -413,6 +414,17 @@ export default function MessageChannel({
             setSending(false);
         }
     };
+
+    const handleReply = React.useCallback((message: Message) => {
+        setReplyingTo(message);
+        setTimeout(() => {
+            textareaRef.current?.focus();
+        }, 0);
+    }, []);
+
+    const handleCancelReply = React.useCallback(() => {
+        setReplyingTo(null);
+    }, []);
 
     // Handle text change for mentions
     const handleTextChange = React.useCallback((newText: string) => {
@@ -1245,7 +1257,8 @@ export default function MessageChannel({
                                     onEditingTextChange={setEditingText}
                                     onEditSave={handleEditSave}
                                     onEditCancel={handleEditCancel}
-                                    onContentLoad={scrollToBottom} // Add scroll callback
+                                    onReply={handleReply}
+                                    onContentLoad={scrollToBottom}
                                 />
                             );
 
@@ -1274,6 +1287,7 @@ export default function MessageChannel({
                                                 handleMessageUnpinned
                                             }
                                             onMessageEdit={handleMessageEdit}
+                                            onReply={handleReply}
                                         >
                                             {messageElement}
                                         </MessageContextMenu>
@@ -1307,6 +1321,8 @@ export default function MessageChannel({
                 currentUserId={currentUserId}
                 textareaRef={textareaRef}
                 fileInputRef={fileInputRef}
+                replyingTo={replyingTo}
+                onCancelReply={handleCancelReply}
             />
         </div>
     );

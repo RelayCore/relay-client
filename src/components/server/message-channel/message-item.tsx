@@ -8,6 +8,7 @@ import { UserAvatar } from "../user-avatar";
 import { AttachmentItem } from "./attachment-item";
 import { ProcessedMessageContent, OGData } from "./message-content";
 import { MessageContentProcessor } from "./message-content-processor";
+import { ReplyPreview } from "./reply-preview";
 
 export function formatMessageDate(timestamp: string): string {
     const date = new Date(timestamp);
@@ -64,7 +65,8 @@ export function MessageItem({
     onEditingTextChange,
     onEditSave,
     onEditCancel,
-    onContentLoad, // Add this prop
+    onReply,
+    onContentLoad,
 }: {
     message: Message;
     showHeader?: boolean;
@@ -78,7 +80,8 @@ export function MessageItem({
     onEditingTextChange?: (text: string) => void;
     onEditSave?: (messageId: number, content: string) => void;
     onEditCancel?: () => void;
-    onContentLoad?: () => void; // Add this prop
+    onReply?: (message: Message) => void;
+    onContentLoad?: () => void;
 }) {
     const { users } = useMembers();
     const formattedDate = formatMessageDate(message.created_at);
@@ -265,14 +268,26 @@ export function MessageItem({
         }
 
         return (
-            <div className="text-sm break-words whitespace-pre-wrap">
-                <ProcessedMessageContent
-                    parts={messageContentParts}
-                    currentUserId={currentUserId}
-                    ogDataMap={ogDataMap}
-                    onImageClick={onImageClick}
-                    onContentLoad={onContentLoad} // Pass the callback down
-                />
+            <div>
+                {/* Reply Preview */}
+                {message.reply_to_message && (
+                    <ReplyPreview
+                        replyToMessage={message.reply_to_message}
+                        isCompact={true}
+                        className="ml-0"
+                    />
+                )}
+
+                {/* Message Content */}
+                <div className="text-sm break-words whitespace-pre-wrap">
+                    <ProcessedMessageContent
+                        parts={messageContentParts}
+                        currentUserId={currentUserId}
+                        ogDataMap={ogDataMap}
+                        onImageClick={onImageClick}
+                        onContentLoad={onContentLoad}
+                    />
+                </div>
             </div>
         );
     }, [
@@ -281,12 +296,15 @@ export function MessageItem({
         messageContentParts,
         currentUserId,
         message.id,
+        message.reply_to_message,
+        message.reply_count,
         handleTextareaChange,
         handleEditKeyDown,
         onEditSave,
         onEditCancel,
+        onReply,
         ogDataMap,
-        onContentLoad, // Add to dependencies
+        onContentLoad,
     ]);
 
     return (

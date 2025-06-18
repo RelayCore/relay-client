@@ -21,15 +21,16 @@ import { toast } from "sonner";
 interface MessageContextMenuProps {
     message: Message;
     serverUrl: string;
-    currentUserId: string; // Make required
-    currentUser: User; // Make required
-    channel: Channel; // Make required
-    isPinned?: boolean;
+    currentUserId: string;
+    currentUser: User;
+    channel: Channel;
+    isPinned: boolean;
+    onMessageDeleted: (messageId: number) => void;
+    onMessagePinned: (messageId: number) => void;
+    onMessageUnpinned: (messageId: number) => void;
+    onMessageEdit: (messageId: number) => void;
+    onReply?: (message: Message) => void;
     children: React.ReactNode;
-    onMessageDeleted?: (messageId: number) => void;
-    onMessagePinned?: (messageId: number) => void;
-    onMessageUnpinned?: (messageId: number) => void;
-    onMessageEdit?: (messageId: number) => void;
 }
 
 export function MessageContextMenu({
@@ -38,12 +39,13 @@ export function MessageContextMenu({
     currentUserId,
     currentUser,
     channel,
-    isPinned = false,
-    children,
+    isPinned,
     onMessageDeleted,
     onMessagePinned,
     onMessageUnpinned,
     onMessageEdit,
+    onReply,
+    children,
 }: MessageContextMenuProps) {
     const isOwnMessage = message.author_id === currentUserId;
     const canPin = canPinInChannel(channel, currentUser);
@@ -96,11 +98,6 @@ export function MessageContextMenu({
         }
     };
 
-    const handleReplyToMessage = () => {
-        // TODO: Implement reply functionality
-        toast.info("Reply functionality coming soon");
-    };
-
     const handleEditMessage = () => {
         onMessageEdit?.(message.id);
     };
@@ -116,10 +113,15 @@ export function MessageContextMenu({
                     </ContextMenuItem>
                 )}
 
-                <ContextMenuItem onClick={handleReplyToMessage}>
-                    <Reply size={16} />
-                    Reply
-                </ContextMenuItem>
+                {onReply && (
+                    <ContextMenuItem
+                        onClick={() => onReply(message)}
+                        className="cursor-pointer"
+                    >
+                        <Reply className="h-4 w-4" />
+                        Reply
+                    </ContextMenuItem>
+                )}
 
                 <ContextMenuItem onClick={handleCopyMessage}>
                     <Copy size={16} />

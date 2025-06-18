@@ -56,17 +56,30 @@ export interface TaggedUser {
     nickname: string;
 }
 
+export interface ReplyToMessage {
+    id: number;
+    author_id: string;
+    content: string;
+    created_at: string;
+    username: string;
+    nickname: string;
+}
+
 export interface Message {
     id: number;
     channel_id: number;
     author_id: string;
     username: string;
+    nickname?: string;
     content: string;
     created_at: string;
     updated_at: string;
     attachments: Attachment[];
     pinned: boolean;
     tagged_users?: TaggedUser[];
+    reply_to_message_id?: number;
+    reply_to_message?: ReplyToMessage;
+    reply_count: number;
 }
 
 export interface MessageSearchResponse {
@@ -81,6 +94,9 @@ export interface MessageSearchResponse {
     nickname: string;
     attachments: Attachment[];
     pinned: boolean;
+    reply_to_message_id?: number;
+    reply_to_message?: ReplyToMessage;
+    reply_count: number;
 }
 
 export interface SearchMessagesRequest {
@@ -391,10 +407,15 @@ export async function sendMessageWithAttachments(
     channelId: number,
     content: string,
     files?: File[],
+    replyToMessageId?: number,
 ): Promise<Message> {
     const formData = new FormData();
     formData.append("channel_id", channelId.toString());
     formData.append("content", content);
+
+    if (replyToMessageId) {
+        formData.append("reply_to_message_id", replyToMessageId.toString());
+    }
 
     if (files && files.length > 0) {
         files.forEach((file) => {
@@ -406,6 +427,21 @@ export async function sendMessageWithAttachments(
         method: "POST",
         body: formData,
     });
+}
+
+export async function getMessageReplies(
+    serverUrl: string,
+    userId: string,
+    messageId: number,
+    limit: number = 20,
+    offset: number = 0,
+): Promise<{ replies: Message[]; count: number; original_message_id: number }> {
+    const endpoint = `/messages/replies?message_id=${messageId}&limit=${limit}&offset=${offset}`;
+    return apiRequest<{
+        replies: Message[];
+        count: number;
+        original_message_id: number;
+    }>(serverUrl, endpoint, userId);
 }
 
 // Delete a message
