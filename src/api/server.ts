@@ -319,7 +319,7 @@ function getClientMetadata(): ClientMetadata {
     };
 }
 
-async function apiRequest<T>(
+export async function apiRequest<T>(
     serverUrl: string,
     endpoint: string,
     userId?: string,

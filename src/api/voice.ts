@@ -2,6 +2,7 @@ import { ServerRecord } from "@/storage/server-store";
 import { getSetting, SettingsInterface } from "@/utils/settings";
 import { WebSocketMessage } from "@/websocket/websocket-manager";
 import { VoiceParticipant } from "./server";
+import { apiRequest } from "./server";
 
 export interface VoiceJoinResponse {
     status: string;
@@ -45,43 +46,30 @@ export interface VoiceEventData {
 
 // HTTP API Client
 export class VoiceAPI {
-    constructor(private server: ServerRecord) {}
-
-    private get headers() {
-        return {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${this.server.user_id}`,
-        };
-    }
+    constructor(
+        private serverUrl: string,
+        private userId: string,
+    ) {}
 
     async joinChannel(channelId: number): Promise<VoiceJoinResponse> {
-        const response = await fetch(`${this.server.server_url}/voice/join`, {
-            method: "POST",
-            headers: this.headers,
-            body: JSON.stringify({ channel_id: channelId }),
-        });
-
-        if (!response.ok) {
-            throw new Error(
-                `Failed to join voice channel: ${await response.text()}`,
-            );
-        }
-
-        return response.json();
+        return apiRequest<VoiceJoinResponse>(
+            this.serverUrl,
+            "/voice/join",
+            this.userId,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ channel_id: channelId }),
+            },
+        );
     }
 
     async leaveChannel(channelId: number): Promise<void> {
-        const response = await fetch(`${this.server.server_url}/voice/leave`, {
+        await apiRequest<void>(this.serverUrl, "/voice/leave", this.userId, {
             method: "POST",
-            headers: this.headers,
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ channel_id: channelId }),
         });
-
-        if (!response.ok) {
-            throw new Error(
-                `Failed to leave voice channel: ${await response.text()}`,
-            );
-        }
     }
 
     async updateState(
@@ -89,36 +77,24 @@ export class VoiceAPI {
         isMuted: boolean,
         isDeafened: boolean,
     ): Promise<void> {
-        const response = await fetch(`${this.server.server_url}/voice/state`, {
+        await apiRequest<void>(this.serverUrl, "/voice/state", this.userId, {
             method: "POST",
-            headers: this.headers,
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 channel_id: channelId,
                 is_muted: isMuted,
                 is_deafened: isDeafened,
             }),
         });
-
-        if (!response.ok) {
-            throw new Error(
-                `Failed to update voice state: ${await response.text()}`,
-            );
-        }
     }
 
     async getParticipants(channelId: number): Promise<VoiceParticipant[]> {
-        const response = await fetch(
-            `${this.server.server_url}/voice/participants?channel_id=${channelId}`,
-            { headers: this.headers },
+        const endpoint = `/voice/participants?channel_id=${channelId}`;
+        const data = await apiRequest<{ participants: VoiceParticipant[] }>(
+            this.serverUrl,
+            endpoint,
+            this.userId,
         );
-
-        if (!response.ok) {
-            throw new Error(
-                `Failed to get participants: ${await response.text()}`,
-            );
-        }
-
-        const data = await response.json();
         return data.participants || [];
     }
 }
@@ -659,7 +635,7 @@ export class VoiceClient {
     private sendSignalingMessage?: (message: WebSocketMessage) => void;
 
     constructor(private server: ServerRecord) {
-        this.api = new VoiceAPI(server);
+        this.api = new VoiceAPI(server.server_url, server.user_id);
         this.audioManager = new VoiceAudioManager();
         this.setupEventHandlers();
     }
