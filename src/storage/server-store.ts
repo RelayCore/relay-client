@@ -28,13 +28,25 @@ export interface UserIdentity {
     server_url: string;
 }
 
-export async function loadServers(): Promise<ServerRecord[]> {
+let serverCache: ServerRecord[] | null = null;
+export async function initializeServerCache(): Promise<void> {
+    if (serverCache === null) {
+        serverCache = await loadServersFromDisk();
+    }
+}
+
+async function loadServersFromDisk(): Promise<ServerRecord[]> {
     const filePath = await getFilePath();
     const exists = await window.fileSystem.fileExists(filePath);
     if (!exists) return [];
     const result = await window.fileSystem.readFile(filePath, "utf8");
     if (!result.success || !result.data) return [];
     return JSON.parse(result.data as string);
+}
+
+export async function loadServers(): Promise<ServerRecord[]> {
+    await initializeServerCache();
+    return [...(serverCache || [])]; // Return a copy to prevent external mutations
 }
 
 export async function saveServers(servers: ServerRecord[]) {
@@ -44,25 +56,26 @@ export async function saveServers(servers: ServerRecord[]) {
         JSON.stringify(servers, null, 2),
         "utf8",
     );
+    serverCache = [...servers];
 }
 
 export async function addServer(server: ServerRecord) {
-    const servers = await loadServers();
-    const existing = servers.find(
+    await initializeServerCache();
+    const existing = serverCache?.find(
         (s) =>
             s.server_url === server.server_url && s.user_id === server.user_id,
     );
-    if (!existing) {
-        servers.push(server);
-        await saveServers(servers);
+    if (!existing && serverCache) {
+        serverCache.push(server);
+        await saveServers(serverCache);
         // Trigger a custom event to notify components that servers have changed
         window.dispatchEvent(new CustomEvent("servers-updated"));
     }
 }
 
 export async function getServerById(userId: string): Promise<ServerRecord> {
-    const servers = await loadServers();
-    const server = servers.find((s) => s.user_id === userId);
+    await initializeServerCache();
+    const server = serverCache?.find((s) => s.user_id === userId);
     if (!server) {
         throw new Error(`Server with user ID ${userId} not found`);
     }
@@ -70,13 +83,15 @@ export async function getServerById(userId: string): Promise<ServerRecord> {
 }
 
 export async function removeServer(serverUrl: string, userId: string) {
-    const servers = await loadServers();
-    const filteredServers = servers.filter(
-        (s) => !(s.server_url === serverUrl && s.user_id === userId),
-    );
-    await saveServers(filteredServers);
-    // Trigger a custom event to notify components that servers have changed
-    window.dispatchEvent(new CustomEvent("servers-updated"));
+    await initializeServerCache();
+    if (serverCache) {
+        serverCache = serverCache.filter(
+            (s) => !(s.server_url === serverUrl && s.user_id === userId),
+        );
+        await saveServers(serverCache);
+        // Trigger a custom event to notify components that servers have changed
+        window.dispatchEvent(new CustomEvent("servers-updated"));
+    }
 }
 
 export async function exportUserIdentity(

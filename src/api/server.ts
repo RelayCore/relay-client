@@ -1,3 +1,5 @@
+import { getServerById } from "@/storage/server-store";
+
 export interface ServerInfo {
     name: string;
     description: string;
@@ -289,7 +291,8 @@ async function apiRequest<T>(
     const requestHeaders: Record<string, string> = { ...headers };
 
     if (requiresAuth && userId) {
-        requestHeaders.Authorization = `Bearer ${userId}`;
+        const server = await getServerById(userId);
+        requestHeaders.Authorization = `Bearer ${server.public_key}`;
     }
 
     const response = await fetch(`${serverUrl}${endpoint}`, {
