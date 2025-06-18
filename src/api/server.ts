@@ -1,4 +1,6 @@
 import { getServerById } from "@/storage/server-store";
+import { APP_CONFIG } from "@/config";
+import pkg from "../../package.json";
 
 export interface ServerInfo {
     name: string;
@@ -281,6 +283,26 @@ export interface UpdateServerConfigResponse {
     max_attachments: number;
 }
 
+interface ClientMetadata {
+    client_name: string;
+    client_version: string;
+    platform: string;
+    timestamp: string;
+}
+
+function getClientMetadata(): ClientMetadata {
+    return {
+        client_name: APP_CONFIG.protocolName,
+        client_version: pkg.version,
+        platform:
+            // @ts-expect-error: userAgentData is not yet in the standard TypeScript DOM types
+            navigator?.userAgentData?.platform ||
+            navigator?.platform ||
+            "unknown",
+        timestamp: new Date().toISOString(),
+    };
+}
+
 async function apiRequest<T>(
     serverUrl: string,
     endpoint: string,
@@ -294,6 +316,12 @@ async function apiRequest<T>(
         const server = await getServerById(userId);
         requestHeaders.Authorization = `Bearer ${server.public_key}`;
     }
+
+    const metadata = getClientMetadata();
+    requestHeaders["X-Client-Name"] = metadata.client_name;
+    requestHeaders["X-Client-Version"] = metadata.client_version;
+    requestHeaders["X-Client-Platform"] = metadata.platform;
+    requestHeaders["X-Client-Timestamp"] = metadata.timestamp;
 
     const response = await fetch(`${serverUrl}${endpoint}`, {
         method,
