@@ -13,6 +13,7 @@ export interface ServerRecord {
     public_key: string;
     private_key: string;
     joined_at: string;
+    identity_id: string;
     server_name?: string;
     server_description?: string;
     server_allow_invite?: boolean;
@@ -21,6 +22,7 @@ export interface ServerRecord {
 }
 
 export interface UserIdentity {
+    identity_id: string;
     user_id: string;
     public_key: string;
     private_key: string;
@@ -32,6 +34,19 @@ let serverCache: ServerRecord[] | null = null;
 export async function initializeServerCache(): Promise<void> {
     if (serverCache === null) {
         serverCache = await loadServersFromDisk();
+        // Ensure all servers have identity_id, generate and save if missing
+        let updated = false;
+        if (serverCache) {
+            for (const server of serverCache) {
+                if (!server.identity_id) {
+                    server.identity_id = crypto.randomUUID();
+                    updated = true;
+                }
+            }
+            if (updated) {
+                await saveServers(serverCache);
+            }
+        }
     }
 }
 
@@ -100,6 +115,7 @@ export async function exportUserIdentity(
 ): Promise<string> {
     const server = await getServerById(userId);
     const identity: UserIdentity = {
+        identity_id: server.identity_id ?? crypto.randomUUID(),
         user_id: server.user_id,
         public_key: server.public_key,
         private_key: server.private_key,
@@ -143,6 +159,10 @@ export async function importUserIdentity(
         ) {
             throw new Error("Invalid identity format");
         }
+        // Ensure identity_id exists
+        if (!identity.identity_id) {
+            identity.identity_id = crypto.randomUUID();
+        }
         return identity;
     } catch {
         throw new Error("Failed to import user identity");
@@ -152,6 +172,7 @@ export async function importUserIdentity(
 export async function exportAllIdentities(): Promise<string> {
     const servers = await loadServers();
     const identities: UserIdentity[] = servers.map((server) => ({
+        identity_id: server.identity_id ?? crypto.randomUUID(),
         user_id: server.user_id,
         public_key: server.public_key,
         private_key: server.private_key,
@@ -209,6 +230,10 @@ export async function importAllIdentities(
             ) {
                 throw new Error("Invalid identity format");
             }
+            // Ensure identity_id exists
+            if (!identity.identity_id) {
+                identity.identity_id = crypto.randomUUID();
+            }
         }
         return identities;
     } catch {
@@ -239,6 +264,7 @@ export async function restoreIdentityToServer(
         public_key: identity.public_key,
         private_key: identity.private_key,
         joined_at: identity.created_at,
+        identity_id: identity.identity_id ?? crypto.randomUUID(),
         server_name: serverMetadata?.name,
         server_description: serverMetadata?.description,
         server_allow_invite: serverMetadata?.allowInvite,
