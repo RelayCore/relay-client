@@ -31,6 +31,33 @@ export interface UserIdentity {
     server_url: string;
 }
 
+export interface ServerIdentity {
+    id: string; // uuid
+    identity_id: string;
+    account_id: string;
+    public_key: string;
+    private_key: string;
+    server_url: string;
+    created_at: string; // ISO timestamp
+    updated_at: string; // ISO timestamp
+}
+
+/**
+ * Convert a ServerIdentity to a UserIdentity.
+ */
+export function serverIdentityToUserIdentity(
+    identity: ServerIdentity,
+): UserIdentity {
+    return {
+        identity_id: identity.identity_id,
+        user_id: identity.account_id,
+        public_key: identity.public_key,
+        private_key: identity.private_key,
+        created_at: identity.created_at,
+        server_url: identity.server_url,
+    };
+}
+
 let serverCache: ServerRecord[] | null = null;
 export async function initializeServerCache(): Promise<void> {
     if (serverCache === null) {
@@ -310,4 +337,192 @@ export async function getNewIdentities(
     return identities.filter(
         (identity) => !existingUserIds.has(identity.user_id),
     );
+}
+
+/**
+ * Fetch all identities from the server for the current session.
+ */
+export async function fetchServerIdentities(
+    serverUrl: string,
+): Promise<ServerIdentity[]> {
+    const response = await fetch(`${serverUrl}/api/identity`, {
+        credentials: "include",
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to fetch identities: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+/**
+ * Create a new identity on the server for the current session.
+ */
+export async function createServerIdentity(
+    serverUrl: string,
+    identity: UserIdentity,
+): Promise<ServerIdentity> {
+    const response = await fetch(`${serverUrl}/api/identity`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            identity_id: identity.identity_id,
+            public_key: identity.public_key,
+            private_key: identity.private_key,
+            server_url: identity.server_url,
+        }),
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to create identity: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+/**
+ * Update an identity on the server for the current session.
+ */
+export async function updateServerIdentity(
+    serverUrl: string,
+    identity_id: string,
+    updates: UserIdentity,
+): Promise<ServerIdentity> {
+    const response = await fetch(`${serverUrl}/api/identity/${identity_id}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            public_key: updates.public_key,
+            private_key: updates.private_key,
+            server_url: updates.server_url,
+        }),
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to update identity: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+/**
+ * Delete an identity from the server for the current session.
+ */
+export async function deleteServerIdentity(
+    serverUrl: string,
+    identity_id: string,
+): Promise<void> {
+    const response = await fetch(`${serverUrl}/api/identity/${identity_id}`, {
+        method: "DELETE",
+        credentials: "include",
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to delete identity: ${response.statusText}`);
+    }
+}
+
+/**
+ * Get a specific identity by identity_id from the server for the current session.
+ */
+export async function fetchServerIdentityById(
+    serverUrl: string,
+    identity_id: string,
+): Promise<ServerIdentity> {
+    const response = await fetch(`${serverUrl}/api/identity/${identity_id}`, {
+        credentials: "include",
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to fetch identity: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+/**
+ * Helper to compare ISO date strings.
+ * Returns true if a is newer than b.
+ */
+function isNewer(a?: string, b?: string): boolean {
+    if (!a) return false;
+    if (!b) return true;
+    return new Date(a).getTime() > new Date(b).getTime();
+}
+
+/**
+ * Pull all identities from the server and update/add to local storage if server is newer.
+ */
+export async function pullServerIdentitiesToLocal(
+    serverUrl: string,
+): Promise<void> {
+    const serverIdentities: ServerIdentity[] =
+        await fetchServerIdentities(serverUrl);
+    const localServers = await loadServers();
+    const localById = new Map(localServers.map((s) => [s.identity_id, s]));
+
+    for (const identity of serverIdentities) {
+        const local = localById.get(identity.identity_id);
+        const serverUpdatedAt = identity.updated_at || identity.created_at;
+        const localLastModified = local?.last_modified;
+
+        if (!local) {
+            // Use the conversion helper
+            await restoreIdentityToServer(
+                serverIdentityToUserIdentity(identity),
+                serverUrl,
+            );
+        } else if (isNewer(serverUpdatedAt, localLastModified)) {
+            await removeServer(serverUrl, local.user_id);
+            await restoreIdentityToServer(
+                serverIdentityToUserIdentity(identity),
+                serverUrl,
+            );
+        }
+    }
+}
+
+/**
+ * Push all local identities to the server, updating or creating as needed.
+ */
+export async function pushLocalIdentitiesToServer(
+    serverUrl: string,
+): Promise<void> {
+    const localServers = await loadServers();
+    const serverIdentities: ServerIdentity[] =
+        await fetchServerIdentities(serverUrl);
+    const serverById = new Map(serverIdentities.map((i) => [i.identity_id, i]));
+
+    for (const local of localServers) {
+        const server = serverById.get(local.identity_id);
+        const serverUpdatedAt = server?.updated_at || server?.created_at;
+        const localLastModified = local.last_modified;
+
+        const localUserIdentity: UserIdentity = {
+            identity_id: local.identity_id,
+            user_id: local.user_id,
+            public_key: local.public_key,
+            private_key: local.private_key,
+            created_at: local.joined_at,
+            server_url: local.server_url,
+        };
+
+        if (!server) {
+            await createServerIdentity(serverUrl, localUserIdentity);
+        } else if (isNewer(localLastModified, serverUpdatedAt)) {
+            await updateServerIdentity(
+                serverUrl,
+                local.identity_id,
+                localUserIdentity,
+            );
+        }
+    }
+}
+
+/**
+ * Two-way sync: ensures both local and server have the latest version of each identity.
+ */
+export async function syncIdentitiesWithServer(
+    serverUrl: string,
+): Promise<void> {
+    await pullServerIdentitiesToLocal(serverUrl);
+    await pushLocalIdentitiesToServer(serverUrl);
 }
