@@ -445,7 +445,21 @@ export class WebSocketConnection {
         }, delay);
     }
 
+    private capitalizeWords(str: string) {
+        return str
+            .toLowerCase()
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+
     private handleMessage(message: WebSocketMessage) {
+        const prettyData =
+            typeof message.data === "object"
+                ? JSON.stringify(message.data, null, 2)
+                : String(message.data);
+
+        logInfo(this.capitalizeWords(message.type), "websocket", prettyData);
+
         // Show a toast for every websocket event in development mode
         if (inDevelopment) {
             toast.info(`[WebSocket] Event: ${message.type}`, {
