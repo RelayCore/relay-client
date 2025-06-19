@@ -133,7 +133,6 @@ export async function importUserIdentity(
     identityString: string,
 ): Promise<UserIdentity> {
     try {
-        console.log(atob(identityString));
         const identity = JSON.parse(atob(identityString)) as UserIdentity;
         // Validate the identity structure
         if (

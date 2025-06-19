@@ -30,6 +30,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { logError } from "@/utils/logger";
 
 export interface ServerHeaderProps {
     userId: string | undefined;
@@ -86,7 +87,7 @@ export default function ServerHeader({
                 });
                 setSearchResults(response.messages);
             } catch (error) {
-                console.error("Search failed:", error);
+                logError("Search failed", "api", String(error));
                 setSearchResults([]);
             } finally {
                 setIsSearching(false);

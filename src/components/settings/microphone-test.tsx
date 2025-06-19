@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/utils/tailwind";
 import { useSetting } from "@/utils/settings";
+import { logError } from "@/utils/logger";
 
 interface MicrophoneTestProps {
     className?: string;
@@ -132,7 +133,11 @@ export function MicrophoneTest({ className }: MicrophoneTestProps) {
             setIsTestingMic(true);
             updateAudioLevel();
         } catch (err) {
-            console.error("Failed to start microphone test:", err);
+            logError(
+                "Failed to start microphone test",
+                "electron",
+                String(err),
+            );
             setError(
                 "Failed to access microphone. Please check permissions and try again.",
             );

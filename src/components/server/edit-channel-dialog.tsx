@@ -44,6 +44,7 @@ import {
 } from "@/api/server";
 import { useServerRecord } from "@/contexts/server-context";
 import { useConfirm } from "@/contexts/confirm-context";
+import { logError } from "@/utils/logger";
 
 interface EditChannelDialogProps {
     open: boolean;
@@ -107,7 +108,7 @@ export default function EditChannelDialog({
             );
             setPermissions(response.permissions);
         } catch (err) {
-            console.error("Failed to load permissions:", err);
+            logError("Failed to load permissions", "api", String(err));
         } finally {
             setLoadingPermissions(false);
         }
@@ -125,7 +126,7 @@ export default function EditChannelDialog({
             setUsers(usersResponse.users);
             setRoles(rolesResponse.roles || []);
         } catch (err) {
-            console.error("Failed to load users/roles:", err);
+            logError("Failed to load users/roles", "api", String(err));
         }
     };
 

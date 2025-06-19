@@ -27,6 +27,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/utils/tailwind";
 import { inDevelopment } from "@/config";
+import { logInfo, logWarning, logError } from "@/utils/logger";
 
 // Interface to keep track of element paths in React component hierarchy
 interface ComponentPathTracker {
@@ -494,8 +495,9 @@ function PerformanceOverlay() {
             fcpObserver.observe({ entryTypes: ["paint"] });
             clsObserver.observe({ entryTypes: ["layout-shift"] });
         } catch (error: unknown) {
-            console.warn(
-                "Some performance observers not supported:",
+            logWarning(
+                "Some performance observers not supported",
+                "ui",
                 error instanceof Error ? error.message : String(error),
             );
         }
@@ -513,8 +515,9 @@ function PerformanceOverlay() {
                 fcpObserver.disconnect();
                 clsObserver.disconnect();
             } catch (error: unknown) {
-                console.warn(
-                    "Error disconnecting observers:",
+                logWarning(
+                    "Error disconnecting observers",
+                    "ui",
                     error instanceof Error ? error.message : String(error),
                 );
             }
@@ -1065,7 +1068,11 @@ export function DevContextMenu({ children }: { children: React.ReactNode }) {
 
                 lastTargetElement.dispatchEvent(eventObj);
             } catch (error) {
-                console.error(`Error dispatching ${event} event:`, error);
+                logError(
+                    `Error dispatching ${event} event`,
+                    "ui",
+                    error instanceof Error ? error.message : String(error),
+                );
                 toast.error(`Failed to dispatch ${event} event`);
             }
         } else {
@@ -1079,10 +1086,11 @@ export function DevContextMenu({ children }: { children: React.ReactNode }) {
         // Check for Redux DevTools Extension
         if (window.__REDUX_DEVTOOLS_EXTENSION__) {
             try {
-                console.info("Redux state found. Check Redux DevTools.");
+                logInfo("Redux state found. Check Redux DevTools.", "ui");
             } catch (error: unknown) {
-                console.error(
+                logError(
                     "Failed to access Redux state",
+                    "ui",
                     error instanceof Error ? error.message : String(error),
                 );
             }
@@ -1097,14 +1105,11 @@ export function DevContextMenu({ children }: { children: React.ReactNode }) {
         };
 
         // Log state to console in a nice format
-        console.group(
-            "%c🌐 Global State Overview",
-            "font-weight: bold; font-size: 14px",
-        );
+        logInfo("🌐 Global State Overview", "ui");
         console.table(globalState);
 
         // Add more detailed logging for specific items
-        console.group("%c📦 localStorage Items", "color: #0066cc");
+        logInfo("📦 localStorage Items", "ui");
         const localStorageItems: Record<string, string | null> = {};
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -1119,7 +1124,7 @@ export function DevContextMenu({ children }: { children: React.ReactNode }) {
         console.table(localStorageItems);
         console.groupEnd();
 
-        console.group("%c🔄 sessionStorage Items", "color: #6600cc");
+        logInfo("🔄 sessionStorage Items", "ui");
         const sessionStorageItems: Record<string, string | null> = {};
         for (let i = 0; i < sessionStorage.length; i++) {
             const key = sessionStorage.key(i);
@@ -1134,7 +1139,7 @@ export function DevContextMenu({ children }: { children: React.ReactNode }) {
         console.table(sessionStorageItems);
         console.groupEnd();
 
-        console.group("%c🍪 Cookies", "color: #cc6600");
+        logInfo("🍪 Cookies", "ui");
         const cookieItems: Record<string, string> = {};
         document.cookie.split(";").forEach((cookie) => {
             const parts = cookie.trim().split("=");
@@ -1145,8 +1150,6 @@ export function DevContextMenu({ children }: { children: React.ReactNode }) {
             }
         });
         console.table(cookieItems);
-        console.groupEnd();
-
         console.groupEnd();
 
         // Show a single toast to notify user to check console

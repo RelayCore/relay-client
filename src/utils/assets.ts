@@ -1,4 +1,5 @@
 import { inDevelopment } from "@/config";
+import { logError } from "@/utils/logger";
 
 export function assetSrc(path: string) {
     if (!path.startsWith("/")) {
@@ -40,7 +41,7 @@ export async function downloadFile(fileUrl: string, fileName: string) {
         // Clean up the blob URL
         window.URL.revokeObjectURL(url);
     } catch (fetchError) {
-        console.error("Download failed:", fetchError);
+        logError("Download failed", "electron", String(fetchError));
         // Fallback: open in new tab
         window.open(fileUrl, "_blank");
     }

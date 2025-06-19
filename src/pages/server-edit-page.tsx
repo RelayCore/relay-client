@@ -56,6 +56,7 @@ import { useNavigate } from "@tanstack/react-router";
 import ServerHeader from "@/components/server/server-header";
 import { useConfirm } from "@/contexts/confirm-context";
 import { ServerIconCropper } from "@/components/server-edit/server-icon";
+import { logError } from "@/utils/logger";
 
 // Available permissions grouped by category
 const PERMISSION_GROUPS: {
@@ -315,7 +316,7 @@ export default function ServerEditPage() {
             );
             setInvites(response.invites || []);
         } catch (error) {
-            console.error("Failed to load invites:", error);
+            logError("Failed to load invites", "api", String(error));
             toast.error("Failed to load invites");
         } finally {
             setLoadingInvites(false);
@@ -356,7 +357,7 @@ export default function ServerEditPage() {
             // Reset form
             setNewInvite({ expires_in: 24, max_uses: 0 });
         } catch (error) {
-            console.error("Failed to create invite:", error);
+            logError("Failed to create invite", "api", String(error));
             toast.error("Failed to create invite");
         } finally {
             setCreatingInvite(false);
@@ -378,7 +379,7 @@ export default function ServerEditPage() {
 
             toast.success("Invite deleted successfully");
         } catch (error) {
-            console.error("Failed to delete invite:", error);
+            logError("Failed to delete invite", "api", String(error));
             toast.error("Failed to delete invite");
             // Reload invites on error to restore state
             loadInvites();
@@ -502,7 +503,7 @@ export default function ServerEditPage() {
             });
             clearServerStatusCache();
         } catch (error) {
-            console.error("Failed to create role:", error);
+            logError("Failed to create role", "api", String(error));
             toast.error("Failed to create role");
             // Only refresh on error to sync with server
             refreshServerData();
@@ -556,7 +557,7 @@ export default function ServerEditPage() {
             setEditRole(null);
             clearServerStatusCache();
         } catch (error) {
-            console.error("Failed to update role:", error);
+            logError("Failed to update role", "api", String(error));
             toast.error("Failed to update role");
             // Only refresh on error to sync with server
             refreshServerData();
@@ -616,7 +617,7 @@ export default function ServerEditPage() {
             toast.success("Role deleted successfully");
             clearServerStatusCache();
         } catch (error) {
-            console.error("Failed to delete role:", error);
+            logError("Failed to delete role", "api", String(error));
             toast.error("Failed to delete role");
             // Only refresh on error to sync with server
             refreshServerData();

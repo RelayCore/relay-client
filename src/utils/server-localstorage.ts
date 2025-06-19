@@ -1,3 +1,5 @@
+import { logError } from "@/utils/logger";
+
 interface ChannelInfo {
     id: number;
     lastVisited: string;
@@ -23,7 +25,7 @@ export function getChannelInfo(
         const parsed: ServerChannelData = JSON.parse(data);
         return parsed[serverId]?.[channelId.toString()] || null;
     } catch (error) {
-        console.error("Error reading channel info from localStorage:", error);
+        logError("Error reading channel info from localStorage", "cache", String(error));
         return null;
     }
 }
@@ -52,7 +54,7 @@ export function setChannelInfo(
 
         localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
     } catch (error) {
-        console.error("Error saving channel info to localStorage:", error);
+        logError("Error saving channel info to localStorage", "cache", String(error));
     }
 }
 
@@ -66,10 +68,7 @@ export function getAllChannelInfo(
         const parsed: ServerChannelData = JSON.parse(data);
         return parsed[serverId] || {};
     } catch (error) {
-        console.error(
-            "Error reading server channel data from localStorage:",
-            error,
-        );
+        logError("Error reading server channel data from localStorage", "cache", String(error));
         return {};
     }
 }
@@ -85,7 +84,7 @@ export function removeChannelInfo(serverId: string, channelId: number): void {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
         }
     } catch (error) {
-        console.error("Error removing channel info from localStorage:", error);
+        logError("Error removing channel info from localStorage", "cache", String(error));
     }
 }
 
@@ -98,10 +97,7 @@ export function clearServerChannelData(serverId: string): void {
         delete parsed[serverId];
         localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
     } catch (error) {
-        console.error(
-            "Error clearing server channel data from localStorage:",
-            error,
-        );
+        logError("Error clearing server channel data from localStorage", "cache", String(error));
     }
 }
 

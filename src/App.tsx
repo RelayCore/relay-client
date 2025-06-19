@@ -4,6 +4,7 @@ import { syncThemeWithLocal } from "./helpers/theme-helpers";
 import { router } from "./routes/router";
 import { RouterProvider } from "@tanstack/react-router";
 import { loadingManager } from "./helpers/loading-manager";
+import { log } from "./utils/logger";
 
 export default function App() {
     const [appReady, setAppReady] = useState(false);
@@ -29,7 +30,12 @@ export default function App() {
                     loadingManager.completeLoading();
                 }, 100);
             } catch (error) {
-                console.error("Error during app initialization:", error);
+                log(
+                    "Error during app initialization:",
+                    "error",
+                    "electron",
+                    error instanceof Error ? error.message : String(error),
+                );
                 // Still mark as ready even if there's an error
                 setAppReady(true);
                 loadingManager.completeLoading();
@@ -61,10 +67,10 @@ function renderApp() {
 
     // Check if we already have a root in the window object
     if (!window.__APP_ROOT__) {
-        console.log("Creating new React root");
+        log("Creating new React root", "info", "electron");
         window.__APP_ROOT__ = createRoot(rootElement);
     } else {
-        console.log("Reusing existing React root");
+        log("Reusing existing React root", "info", "electron");
     }
 
     window.__APP_ROOT__.render(

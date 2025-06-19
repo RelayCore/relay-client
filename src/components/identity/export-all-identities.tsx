@@ -15,6 +15,7 @@ import {
     loadServers,
 } from "@/storage/server-store";
 import { toast } from "sonner";
+import { logError } from "@/utils/logger";
 
 interface ExportAllIdentitiesDialogProps {
     open: boolean;
@@ -54,7 +55,11 @@ export function ExportAllIdentitiesDialog({
             setQrCodeDataUrl(qrCode);
             setServerCount(servers.length);
         } catch (error) {
-            console.error("Failed to generate identity data:", error);
+            logError(
+                "Failed to generate identity data",
+                "api",
+                error instanceof Error ? error.message : String(error),
+            );
             toast.error("Failed to generate export data");
         } finally {
             setLoading(false);
@@ -66,14 +71,20 @@ export function ExportAllIdentitiesDialog({
             await navigator.clipboard.writeText(identityString);
             toast.success("Copied to clipboard");
         } catch (error) {
-            console.error("Failed to copy to clipboard:", error);
+            logError(
+                "Failed to copy to clipboard",
+                "electron",
+                error instanceof Error ? error.message : String(error),
+            );
             toast.error("Failed to copy to clipboard");
         }
     };
 
     const downloadQRCode = () => {
         const link = document.createElement("a");
-        link.download = `relay-all-identities-${new Date().toISOString().split("T")[0]}.png`;
+        link.download = `relay-all-identities-${
+            new Date().toISOString().split("T")[0]
+        }.png`;
         link.href = qrCodeDataUrl;
         link.click();
     };
@@ -82,7 +93,9 @@ export function ExportAllIdentitiesDialog({
         const blob = new Blob([identityString], { type: "text/plain" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
-        link.download = `relay-all-identities-${new Date().toISOString().split("T")[0]}.txt`;
+        link.download = `relay-all-identities-${
+            new Date().toISOString().split("T")[0]
+        }.txt`;
         link.href = url;
         link.click();
         URL.revokeObjectURL(url);

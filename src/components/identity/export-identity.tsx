@@ -14,6 +14,7 @@ import {
     exportUserIdentityAsQR,
 } from "@/storage/server-store";
 import { toast } from "sonner";
+import { logError } from "@/utils/logger";
 
 interface ExportIdentityDialogProps {
     open: boolean;
@@ -54,7 +55,11 @@ export function ExportIdentityDialog({
             setIdentityString(identity);
             setQrCodeDataUrl(qrCode);
         } catch (error) {
-            console.error("Failed to generate identity data:", error);
+            logError(
+                "Failed to generate identity data",
+                "api",
+                error instanceof Error ? error.message : String(error),
+            );
         } finally {
             setLoading(false);
         }
@@ -65,7 +70,11 @@ export function ExportIdentityDialog({
             await navigator.clipboard.writeText(identityString);
             toast.success("Copied to clipboard");
         } catch (error) {
-            console.error("Failed to copy to clipboard:", error);
+            logError(
+                "Failed to copy to clipboard",
+                "electron",
+                error instanceof Error ? error.message : String(error),
+            );
             toast.error("Failed to copy to clipboard");
         }
     };

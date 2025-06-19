@@ -17,6 +17,7 @@ import {
     canPinInChannel,
 } from "@/api/server";
 import { toast } from "sonner";
+import { logError } from "@/utils/logger";
 
 interface MessageContextMenuProps {
     message: Message;
@@ -67,7 +68,7 @@ export function MessageContextMenu({
             toast.success("Message deleted");
             onMessageDeleted?.(message.id);
         } catch (error) {
-            console.error("Failed to delete message:", error);
+            logError("Failed to delete message", "api", String(error));
             toast.error("Failed to delete message");
         }
     };
@@ -80,7 +81,7 @@ export function MessageContextMenu({
             toast.success("Message pinned");
             onMessagePinned?.(message.id);
         } catch (error) {
-            console.error("Failed to pin message:", error);
+            logError("Failed to pin message", "api", String(error));
             toast.error("Failed to pin message");
         }
     };
@@ -93,7 +94,7 @@ export function MessageContextMenu({
             toast.success("Message unpinned");
             onMessageUnpinned?.(message.id);
         } catch (error) {
-            console.error("Failed to unpin message:", error);
+            logError("Failed to unpin message", "api", String(error));
             toast.error("Failed to unpin message");
         }
     };

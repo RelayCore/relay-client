@@ -5,6 +5,7 @@ import {
     addServer,
     removeServer,
 } from "../storage/server-store";
+import { logInfo, logWarning, logError } from "@/utils/logger";
 
 interface FailedUpload {
     serverUrl: string;
@@ -145,8 +146,9 @@ export async function updateAvatarOnAllServers(
                     file,
                 );
                 successful.push(server.server_url);
-                console.log(
+                logInfo(
                     `Avatar updated successfully on ${server.server_name || server.server_url}`,
+                    "ui",
                 );
             } catch (error) {
                 const failedUpload: FailedUpload = {
@@ -160,9 +162,10 @@ export async function updateAvatarOnAllServers(
                     filePath,
                 };
                 failed.push(failedUpload);
-                console.error(
-                    `Failed to update avatar on ${server.server_name || server.server_url}:`,
-                    error,
+                logError(
+                    `Failed to update avatar on ${server.server_name || server.server_url}`,
+                    "ui",
+                    String(error),
                 );
             }
         });
@@ -194,7 +197,7 @@ export async function updateAvatarOnAllServers(
         // Show notification about results
         showAvatarUpdateNotification(successful.length, failed.length);
     } catch (error) {
-        console.error("Error processing avatar file:", error);
+        logError("Error processing avatar file", "ui", String(error));
         // You might want to show an error notification here
     }
 }
@@ -216,8 +219,9 @@ export async function retryFailedAvatarUploads(): Promise<void> {
                 failedUpload.filePath,
             );
             if (!existsResult.success || !existsResult.data) {
-                console.warn(
+                logWarning(
                     `Original file no longer exists: ${failedUpload.filePath}, removing from failed list`,
+                    "ui",
                 );
                 continue;
             }
@@ -235,8 +239,9 @@ export async function retryFailedAvatarUploads(): Promise<void> {
 
             await uploadProfilePicture(server.server_url, server.user_id, file);
             successful.push(server.server_url);
-            console.log(
+            logInfo(
                 `Avatar retry successful on ${failedUpload.serverName || failedUpload.serverUrl}`,
+                "ui",
             );
         } catch (error) {
             stillFailed.push({
@@ -244,9 +249,10 @@ export async function retryFailedAvatarUploads(): Promise<void> {
                 error: error instanceof Error ? error.message : "Unknown error",
                 timestamp: Date.now(),
             });
-            console.error(
-                `Avatar retry failed on ${failedUpload.serverName || failedUpload.serverUrl}:`,
-                error,
+            logError(
+                `Avatar retry failed on ${failedUpload.serverName || failedUpload.serverUrl}`,
+                "ui",
+                String(error),
             );
         }
     }
@@ -298,13 +304,17 @@ function showAvatarUpdateNotification(
     failCount: number,
 ): void {
     if (successCount > 0 && failCount === 0) {
-        console.log(`Avatar updated successfully on ${successCount} server(s)`);
+        logInfo(
+            `Avatar updated successfully on ${successCount} server(s)`,
+            "ui",
+        );
     } else if (successCount > 0 && failCount > 0) {
-        console.log(
+        logWarning(
             `Avatar updated on ${successCount} server(s), failed on ${failCount} server(s)`,
+            "ui",
         );
     } else if (failCount > 0) {
-        console.log(`Avatar update failed on ${failCount} server(s)`);
+        logError(`Avatar update failed on ${failCount} server(s)`, "ui");
     }
 }
 

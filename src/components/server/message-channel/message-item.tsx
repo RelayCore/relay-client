@@ -9,6 +9,7 @@ import { AttachmentItem } from "./attachment-item";
 import { ProcessedMessageContent, OGData } from "./message-content";
 import { MessageContentProcessor } from "./message-content-processor";
 import { ReplyPreview } from "./reply-preview";
+import { logError } from "@/utils/logger";
 
 export function formatMessageDate(timestamp: string): string {
     const date = new Date(timestamp);
@@ -211,7 +212,11 @@ export function MessageItem({
                         onContentLoad?.();
                     }
                 } catch (error) {
-                    console.error("Error fetching OG data for", url, error);
+                    logError(
+                        "Error fetching OG data for " + url,
+                        "api",
+                        String(error),
+                    );
                     if (isActive) {
                         setOgDataMap((prevMap) => ({
                             ...prevMap,

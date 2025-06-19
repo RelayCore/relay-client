@@ -15,6 +15,7 @@ import {
     UserIdentity,
 } from "@/storage/server-store";
 import { toast } from "sonner";
+import { logError } from "@/utils/logger";
 
 interface ImportIdentityDialogProps {
     open: boolean;
@@ -61,7 +62,11 @@ export function ImportIdentityDialog({
             setIdentityString("");
             onOpenChange(false);
         } catch (error) {
-            console.error("Failed to import identity:", error);
+            logError(
+                "Failed to import identity",
+                "api",
+                error instanceof Error ? error.message : String(error),
+            );
             toast.error(
                 error instanceof Error
                     ? error.message
@@ -92,7 +97,6 @@ export function ImportIdentityDialog({
     const detectImportType = (text: string) => {
         try {
             const decoded = JSON.parse(atob(text.trim()));
-            console.log(decoded);
             if (Array.isArray(decoded)) {
                 setImportType("multiple");
             } else {

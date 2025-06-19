@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Upload, Download, X } from "lucide-react";
 import { updateAvatarOnAllServers } from "@/api/profile-picture";
 import { APP_CONFIG } from "@/config";
+import { logError } from "@/utils/logger";
 
 interface AvatarCropperProps {
     value: string;
@@ -378,9 +379,10 @@ export function AvatarCropper({ value }: AvatarCropperProps) {
             const pathsResult = await window.fileSystem.getSystemPaths();
 
             if (!pathsResult.success || !pathsResult.data?.appData) {
-                console.error(
-                    "App data path not found or error fetching paths:",
-                    pathsResult.error,
+                logError(
+                    "App data path not found or error fetching paths",
+                    "electron",
+                    String(pathsResult.error),
                 );
                 return;
             }
@@ -402,10 +404,13 @@ export function AvatarCropper({ value }: AvatarCropperProps) {
             );
 
             if (writeResult.success) {
-                console.log("Avatar saved successfully to:", filePath);
                 updateAvatarOnAllServers(filePath);
             } else {
-                console.error("Failed to save avatar:", writeResult.error);
+                logError(
+                    "Failed to save avatar",
+                    "electron",
+                    String(writeResult.error),
+                );
             }
 
             setSelectedImage(null);

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Copy, Minus, Square, X } from "lucide-react";
 import { useSetting } from "@/utils/settings";
 import { platform } from "@/platform";
+import { logError } from "@/utils/logger";
 
 interface DragWindowRegionProps {
     title?: ReactNode;
@@ -48,7 +49,11 @@ function WindowButtons() {
                     setIsMaximized(maximized);
                 })
                 .catch((err) =>
-                    console.error("Error checking maximized state:", err),
+                    logError(
+                        "Error checking maximized state:",
+                        "ui",
+                        String(err),
+                    ),
                 );
         }
 

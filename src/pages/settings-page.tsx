@@ -16,6 +16,7 @@ import {
 import pkg from "../../package.json";
 import { assetSrc } from "@/utils/assets";
 import { APP_CONFIG } from "@/config";
+import { logError } from "@/utils/logger";
 
 import { MicrophoneTest } from "@/components/settings/microphone-test";
 import { AvatarCropper } from "@/components/settings/avatar-cropper";
@@ -57,7 +58,11 @@ export default function SettingsPage() {
                     output: outputDevices,
                 });
             } catch (error) {
-                console.error("Failed to enumerate audio devices:", error);
+                logError(
+                    "Failed to enumerate audio devices",
+                    "electron",
+                    String(error),
+                );
             }
         };
 

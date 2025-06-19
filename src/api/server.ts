@@ -1,6 +1,7 @@
 import { getServerById } from "@/storage/server-store";
 import { APP_CONFIG } from "@/config";
 import pkg from "../../package.json";
+import { log, logError } from "@/utils/logger";
 
 export interface ServerInfo {
     name: string;
@@ -299,19 +300,36 @@ export interface UpdateServerConfigResponse {
     max_attachments: number;
 }
 
-interface ClientMetadata {
-    client_name: string;
-    client_version: string;
-    platform: string;
-    timestamp: string;
-}
-
 export interface GetMessagesAroundResponse {
     messages: Message[];
     target_message: number;
     count: number;
     messages_before: number;
     messages_after: number;
+}
+
+interface ClientMetadata {
+    client_name: string;
+    client_version: string;
+    platform: string;
+    timestamp: string;
+    device_type: "desktop" | "mobile" | "tablet" | "unknown";
+    timezone: string;
+}
+
+function getDeviceType(): "desktop" | "mobile" | "tablet" | "unknown" {
+    const userAgent = navigator.userAgent.toLowerCase();
+    if (
+        /mobile|android|iphone|ipod|blackberry|iemobile|opera mini/i.test(
+            userAgent,
+        )
+    ) {
+        return "mobile";
+    }
+    if (/tablet|ipad/i.test(userAgent)) {
+        return "tablet";
+    }
+    return "desktop";
 }
 
 function getClientMetadata(): ClientMetadata {
@@ -324,6 +342,8 @@ function getClientMetadata(): ClientMetadata {
             navigator?.platform ||
             "unknown",
         timestamp: new Date().toISOString(),
+        device_type: getDeviceType(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     };
 }
 
@@ -335,30 +355,240 @@ export async function apiRequest<T>(
 ): Promise<T> {
     const { method = "GET", body, headers = {}, requiresAuth = true } = options;
     const requestHeaders: Record<string, string> = { ...headers };
+    const startTime = performance.now();
 
-    if (requiresAuth && userId) {
-        const server = await getServerById(userId);
-        requestHeaders.Authorization = `Bearer ${server.public_key}`;
+    try {
+        // Authentication
+        if (requiresAuth && userId) {
+            try {
+                const server = await getServerById(userId);
+                requestHeaders.Authorization = `Bearer ${server.public_key}`;
+            } catch (authError) {
+                logError(
+                    `Authentication failed for ${method} ${endpoint}`,
+                    "api",
+                    JSON.stringify(
+                        {
+                            error:
+                                authError instanceof Error
+                                    ? authError.message
+                                    : String(authError),
+                            userId: userId
+                                ? `${userId.slice(0, 8)}...`
+                                : undefined,
+                        },
+                        null,
+                        2,
+                    ),
+                );
+                throw new Error(`Authentication failed: ${authError}`);
+            }
+        }
+
+        // Add client metadata headers
+        const metadata = getClientMetadata();
+        requestHeaders["X-Client-Name"] = metadata.client_name;
+        requestHeaders["X-Client-Version"] = metadata.client_version;
+        requestHeaders["X-Client-Platform"] = metadata.platform;
+        requestHeaders["X-Client-Timestamp"] = metadata.timestamp;
+
+        // Collect request details
+        const requestDetails = {
+            url: `${serverUrl}${endpoint}`,
+            method,
+            userId: userId ? `${userId.slice(0, 8)}...` : undefined,
+            timestamp: new Date().toISOString(),
+            headers: {
+                ...requestHeaders,
+                Authorization: requestHeaders.Authorization
+                    ? "[REDACTED]"
+                    : undefined,
+            },
+            body: body
+                ? (() => {
+                      if (body instanceof FormData) {
+                          const formDataInfo: Record<string, unknown> = {};
+                          (body as FormData).forEach((value, key) => {
+                              if (value instanceof File) {
+                                  formDataInfo[key] = {
+                                      type: "File",
+                                      name: value.name,
+                                      size: value.size,
+                                      mimeType: value.type,
+                                  };
+                              } else {
+                                  formDataInfo[key] =
+                                      typeof value === "string" &&
+                                      value.length > 100
+                                          ? `${value.slice(0, 100)}...`
+                                          : value;
+                              }
+                          });
+                          return {
+                              type: "FormData",
+                              keys: (() => {
+                                  const keys: string[] = [];
+                                  for (const pair of body as unknown as Iterable<
+                                      [string, FormDataEntryValue]
+                                  >) {
+                                      keys.push(pair[0]);
+                                  }
+                                  return keys;
+                              })(),
+                              details: formDataInfo,
+                          };
+                      } else {
+                          try {
+                              return {
+                                  type: "JSON",
+                                  data: JSON.parse(body as string),
+                              };
+                          } catch {
+                              return {
+                                  type: "String",
+                                  data:
+                                      typeof body === "string"
+                                          ? `${body.slice(0, 200)}...`
+                                          : "[Non-JSON Body]",
+                              };
+                          }
+                      }
+                  })()
+                : undefined,
+        };
+
+        // Make the request
+        const response = await fetch(`${serverUrl}${endpoint}`, {
+            method,
+            headers: requestHeaders,
+            body,
+        });
+
+        const endTime = performance.now();
+        const duration = Math.round(endTime - startTime);
+
+        // Parse response
+        let responseData: T;
+        let errorText: string | null = null;
+
+        if (response.ok) {
+            try {
+                responseData = await response.json();
+            } catch (parseError) {
+                logError(
+                    `Failed to parse JSON response for ${method} ${endpoint}`,
+                    "api",
+                    JSON.stringify(
+                        {
+                            requestDetails,
+                            parseError:
+                                parseError instanceof Error
+                                    ? parseError.message
+                                    : String(parseError),
+                            duration: `${duration}ms`,
+                        },
+                        null,
+                        2,
+                    ),
+                );
+                throw new Error("Failed to parse response JSON");
+            }
+        } else {
+            try {
+                errorText = await response.text();
+            } catch {
+                errorText = "Failed to read error response";
+            }
+        }
+
+        // Collect response details
+        const responseDetails = {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            duration: `${duration}ms`,
+            size: response.headers.get("content-length")
+                ? `${response.headers.get("content-length")} bytes`
+                : "unknown",
+            headers: (() => {
+                const headersObj: Record<string, string> = {};
+                response.headers.forEach((value, key) => {
+                    headersObj[key] = value;
+                });
+                return headersObj;
+            })(),
+            data: response.ok ? responseData! : undefined,
+            error: errorText,
+        };
+
+        // Log successful request
+        if (response.ok) {
+            log(
+                `${method} ${endpoint}`,
+                "info",
+                "api",
+                JSON.stringify(
+                    {
+                        requestDetails,
+                        responseDetails,
+                    },
+                    null,
+                    2,
+                ),
+            );
+        } else {
+            logError(
+                `${method} ${endpoint}`,
+                "api",
+                JSON.stringify(
+                    {
+                        requestDetails,
+                        responseDetails,
+                    },
+                    null,
+                    2,
+                ),
+            );
+        }
+
+        if (!response.ok) {
+            const error = new Error(
+                errorText || `Request failed: ${response.statusText}`,
+            );
+            error.message = `API Request Failed [${method} ${endpoint}]: ${error.message}`;
+            throw error;
+        }
+
+        return responseData!;
+    } catch (error) {
+        const endTime = performance.now();
+        const duration = Math.round(endTime - startTime);
+
+        logError(
+            `${method} ${endpoint}`,
+            "api",
+            JSON.stringify(
+                {
+                    error:
+                        error instanceof Error ? error.message : String(error),
+                    duration: `${duration}ms`,
+                    stack: error instanceof Error ? error.stack : undefined,
+                    userId: userId ? `${userId.slice(0, 8)}...` : undefined,
+                },
+                null,
+                2,
+            ),
+        );
+
+        // Re-throw with enhanced error information
+        if (
+            error instanceof Error &&
+            !error.message.includes("API Request Failed")
+        ) {
+            error.message = `API Request Failed [${method} ${endpoint}]: ${error.message}`;
+        }
+        throw error;
     }
-
-    const metadata = getClientMetadata();
-    requestHeaders["X-Client-Name"] = metadata.client_name;
-    requestHeaders["X-Client-Version"] = metadata.client_version;
-    requestHeaders["X-Client-Platform"] = metadata.platform;
-    requestHeaders["X-Client-Timestamp"] = metadata.timestamp;
-
-    const response = await fetch(`${serverUrl}${endpoint}`, {
-        method,
-        headers: requestHeaders,
-        body,
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || `Request failed: ${response.statusText}`);
-    }
-
-    return response.json();
 }
 
 // Get server metadata

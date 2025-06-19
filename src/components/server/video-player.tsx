@@ -12,6 +12,7 @@ import {
     Maximize,
 } from "lucide-react";
 import { Attachment, formatFileSize } from "@/api/server";
+import { logError } from "@/utils/logger";
 
 export function CustomVideoPlayer({
     attachment,
@@ -56,7 +57,7 @@ export function CustomVideoPlayer({
                 await videoRef.current.play();
             }
         } catch (error) {
-            console.error("Error playing video:", error);
+            logError("Error playing video", "electron", String(error));
         }
     }, [isPlaying]);
 
@@ -113,7 +114,7 @@ export function CustomVideoPlayer({
                 }
             }
         } catch (error) {
-            console.error("Fullscreen error:", error);
+            logError("Fullscreen error", "electron", String(error));
         }
     }, [isFullscreen]);
 

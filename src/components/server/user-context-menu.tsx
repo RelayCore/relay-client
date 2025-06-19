@@ -37,6 +37,7 @@ import {
     hasPermission,
 } from "@/api/server";
 import { toast } from "sonner";
+import { logError } from "@/utils/logger";
 
 interface UserContextMenuProps {
     children: React.ReactNode;
@@ -107,7 +108,7 @@ export function UserContextMenu({
             toast.success("Role assigned successfully");
         } catch (error) {
             toast.error((error as Error).message || "Failed to assign role");
-            console.error("Error assigning role:", error);
+            logError("Error assigning role", "api", String(error));
         } finally {
             setIsLoading(false);
         }
@@ -122,7 +123,7 @@ export function UserContextMenu({
             toast.success("Role removed successfully");
         } catch (error) {
             toast.error((error as Error).message || "Failed to remove role");
-            console.error("Error removing role:", error);
+            logError("Error removing role", "api", String(error));
         } finally {
             setIsLoading(false);
         }
@@ -316,7 +317,7 @@ export function EditNicknameModal({
             toast.error(
                 (error as Error).message || "Failed to update nickname",
             );
-            console.error("Error updating nickname:", error);
+            logError("Error updating nickname", "api", String(error));
         } finally {
             setIsLoading(false);
         }

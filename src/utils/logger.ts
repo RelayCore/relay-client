@@ -1,4 +1,4 @@
-type Category = "api" | "websocket" | "electron";
+type Category = "api" | "websocket" | "electron" | "ui" | "cache";
 
 interface LogColors {
     [key: string]: string;
@@ -27,6 +27,8 @@ const CATEGORY_COLORS: CategoryColors = {
     api: "#c19c00",
     websocket: "#007acc",
     electron: "#007acc",
+    ui: "#13a10e",
+    cache: "#881798",
 };
 
 const DEFAULT_LOG_COLOR = "#881798";

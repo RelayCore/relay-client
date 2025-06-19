@@ -45,6 +45,7 @@ import { VoiceUserContextMenu } from "./voice-user-context-menu";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 // @ts-expect-error - react-dnd-html5-backend compatibility issue
 import { HTML5Backend } from "react-dnd-html5-backend";
+import { logInfo, logError } from "@/utils/logger";
 
 interface ExpandedGroup extends ChannelGroup {
     expanded: boolean;
@@ -146,7 +147,6 @@ export default function ChannelList({
         if (!userId || !currentUser) return;
 
         const handleWebSocketMessage = (message: WebSocketMessage) => {
-            console.log("ChannelList received WebSocket message:", message);
             switch (message.type) {
                 case MESSAGE_TYPES.USER_JOINED_VOICE: {
                     const data =
@@ -302,7 +302,11 @@ export default function ChannelList({
 
                     await webSocketManager.joinVoiceChannel(userId, channel.id);
                 } catch (error) {
-                    console.error("Failed to join voice channel:", error);
+                    logError(
+                        "Failed to join voice channel",
+                        "api",
+                        String(error),
+                    );
                     setSelectedVoiceChannelId(oldSelectedVoiceChannelId);
                 }
             }
@@ -328,14 +332,15 @@ export default function ChannelList({
     const handleDisconnectFromVoice = async () => {
         if (userId) {
             try {
-                console.log("Disconnecting from voice channel...");
+                logInfo("Disconnecting from voice channel...", "api");
                 await webSocketManager.leaveVoiceChannel(userId);
                 setSelectedVoiceChannelId(null);
-                console.log("Successfully disconnected from voice channel");
+                logInfo("Successfully disconnected from voice channel", "api");
             } catch (error) {
-                console.error(
-                    "Failed to disconnect from voice channel:",
-                    error,
+                logError(
+                    "Failed to disconnect from voice channel",
+                    "api",
+                    String(error),
                 );
                 // Still clear the selected channel on error
                 setSelectedVoiceChannelId(null);
@@ -362,7 +367,7 @@ export default function ChannelList({
                 position: newPosition,
             });
         } catch (error) {
-            console.error("Failed to update channel position:", error);
+            logError("Failed to update channel position", "api", String(error));
         }
     };
 
@@ -739,9 +744,9 @@ function DraggableChannel({
                                 key={participant.user_id}
                                 participant={participant}
                                 openProfile={() => {
-                                    console.log(
-                                        "Open profile for:",
-                                        participant.username,
+                                    logInfo(
+                                        `Open profile for: ${participant.username}`,
+                                        "api",
                                     );
                                 }}
                             >
@@ -842,7 +847,7 @@ function UserPanel({
                 await webSocketManager.setMuted(userId, newMutedState);
                 setIsMuted(newMutedState);
             } catch (error) {
-                console.error("Failed to toggle mute:", error);
+                logError("Failed to toggle mute", "api", String(error));
             }
         }
     };
@@ -870,7 +875,7 @@ function UserPanel({
                     }
                 }
             } catch (error) {
-                console.error("Failed to toggle deafen/mute:", error);
+                logError("Failed to toggle deafen/mute", "api", String(error));
             }
         }
     };

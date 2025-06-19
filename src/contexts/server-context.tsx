@@ -42,6 +42,7 @@ import {
     updateChannelLastMessage,
 } from "@/utils/server-localstorage";
 import { cacheManager } from "@/utils/cache-manager";
+import { logInfo, logWarning } from "@/utils/logger";
 
 interface ServerContextState {
     // Server data
@@ -172,17 +173,21 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                     "server-status-cache",
                     JSON.stringify(parsedCache),
                 );
-                console.log(`Cleared server status cache for: ${userId}`);
+                logInfo(`Cleared server status cache for: ${userId}`, "api");
             }
         } catch (error) {
-            console.warn("Failed to clear server status cache:", error);
+            logWarning(
+                "Failed to clear server status cache",
+                "api",
+                String(error),
+            );
         }
     }, [userId]);
 
     // Fetch server data
     const refreshServerData = React.useCallback(async () => {
         if (!userId) return;
-        console.log(`Refreshing server data for user: ${userId}`);
+        logInfo(`Refreshing server data for user: ${userId}`, "api");
 
         try {
             setLoading(true);
@@ -279,7 +284,11 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                     JSON.stringify(parsedCache),
                 );
             } catch (error) {
-                console.warn("Failed to update server status cache:", error);
+                logWarning(
+                    "Failed to update server status cache",
+                    "api",
+                    String(error),
+                );
             }
         },
         [userId],
@@ -478,9 +487,10 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                 case MESSAGE_TYPES.CHANNEL_UPDATE: {
                     const updates = (message.data as ChannelUpdateBroadcast)
                         .channels;
-                    console.log(
+                    logInfo(
                         "Processing channel updates in context:",
-                        updates,
+                        "api",
+                        JSON.stringify(updates),
                     );
 
                     setChannelGroups((prevGroups) => {

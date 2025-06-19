@@ -40,6 +40,7 @@ import { getServerInfo, ServerInfo } from "@/api/server";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 // @ts-expect-error - Ignoring ESM/CommonJS module warning
 import { HTML5Backend } from "react-dnd-html5-backend";
+import { logInfo, logWarning, logError } from "@/utils/logger";
 
 interface ServerStatus {
     online: boolean;
@@ -260,7 +261,11 @@ function BaseLayoutContent({
                 return statusMap;
             }
         } catch (error) {
-            console.error("Failed to load cached server statuses:", error);
+            logError(
+                "Failed to load cached server statuses",
+                "api",
+                String(error),
+            );
         }
         return new Map<string, ServerStatus>();
     }, []);
@@ -275,9 +280,10 @@ function BaseLayoutContent({
                     JSON.stringify(cacheObj),
                 );
             } catch (error) {
-                console.error(
-                    "Failed to save server statuses to cache:",
-                    error,
+                logError(
+                    "Failed to save server statuses to cache",
+                    "api",
+                    String(error),
                 );
             }
         },
@@ -295,9 +301,10 @@ function BaseLayoutContent({
                     lastChecked: Date.now(),
                 };
             } catch (error) {
-                console.warn(
-                    `Failed to fetch metadata for ${server.server_name || server.server_url}:`,
-                    error,
+                logWarning(
+                    `Failed to fetch metadata for ${server.server_name || server.server_url}`,
+                    "api",
+                    String(error),
                 );
                 return {
                     online: false,
@@ -325,13 +332,11 @@ function BaseLayoutContent({
                     // Still connect to WebSocket even if cached
                     try {
                         await webSocketManager.addServer(server);
-                        console.log(
-                            `Connected to WebSocket for server: ${server.server_name || server.server_url}`,
-                        );
                     } catch (wsError) {
-                        console.warn(
-                            `Failed to connect to WebSocket for server ${server.server_name || server.server_url}:`,
-                            wsError,
+                        logWarning(
+                            `Failed to connect to WebSocket for server ${server.server_name || server.server_url}`,
+                            "websocket",
+                            String(wsError),
                         );
                     }
                     continue; // Skip HTTP check if cache is still valid
@@ -346,13 +351,15 @@ function BaseLayoutContent({
                         if (status.online) {
                             try {
                                 await webSocketManager.addServer(server);
-                                console.log(
+                                logInfo(
                                     `Connected to WebSocket for server: ${server.server_name || server.server_url}`,
+                                    "websocket",
                                 );
                             } catch (wsError) {
-                                console.warn(
-                                    `Failed to connect to WebSocket for server ${server.server_name || server.server_url}:`,
-                                    wsError,
+                                logWarning(
+                                    `Failed to connect to WebSocket for server ${server.server_name || server.server_url}`,
+                                    "websocket",
+                                    String(wsError),
                                 );
                             }
                         }
@@ -390,7 +397,7 @@ function BaseLayoutContent({
                 });
                 setConnectionStates(initialConnectionStates);
             } catch (error) {
-                console.error("Failed to load servers:", error);
+                logError("Failed to load servers", "api", String(error));
             }
         };
 
@@ -553,7 +560,7 @@ function BaseLayoutContent({
                 await saveServers(newServers);
                 window.dispatchEvent(new CustomEvent("servers-updated"));
             } catch (error) {
-                console.error("Failed to save server order:", error);
+                logError("Failed to save server order", "ui", String(error));
                 setServers(servers);
             }
         },

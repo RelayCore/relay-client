@@ -1,4 +1,5 @@
 import { Channel, ServerInfo } from "@/api/server";
+import { logError } from "@/utils/logger";
 
 export interface LocalStorageItems {
     relay_failed_avatar_uploads: string[];
@@ -21,7 +22,11 @@ export function setLocalStorageItem<K extends LocalStorageKey>(
     try {
         localStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
-        console.error(`Error setting localStorage item "${key}":`, error);
+        logError(
+            `Error setting localStorage item "${key}"`,
+            "cache",
+            String(error),
+        );
     }
 }
 
@@ -32,7 +37,11 @@ export function getLocalStorageItem<K extends LocalStorageKey>(
         const value = localStorage.getItem(key);
         return value ? JSON.parse(value) : null;
     } catch (error) {
-        console.error(`Error getting localStorage item "${key}":`, error);
+        logError(
+            `Error getting localStorage item "${key}"`,
+            "cache",
+            String(error),
+        );
         return null;
     }
 }
@@ -41,7 +50,11 @@ export function removeLocalStorageItem(key: string): void {
     try {
         localStorage.removeItem(key);
     } catch (error) {
-        console.error(`Error removing localStorage item "${key}":`, error);
+        logError(
+            `Error removing localStorage item "${key}"`,
+            "cache",
+            String(error),
+        );
     }
 }
 
@@ -54,6 +67,10 @@ export function updateLocalStorageItem<K extends LocalStorageKey>(
         const newValue = updater(currentValue);
         setLocalStorageItem(key, newValue);
     } catch (error) {
-        console.error(`Error updating localStorage item "${key}":`, error);
+        logError(
+            `Error updating localStorage item "${key}"`,
+            "cache",
+            String(error),
+        );
     }
 }

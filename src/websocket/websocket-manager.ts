@@ -3,6 +3,7 @@ import { VoiceClient, VoiceEventData } from "@/api/voice";
 import { toast } from "sonner";
 import { inDevelopment } from "@/config";
 import { Attachment, Message, Permission } from "@/api/server";
+import { logInfo, logWarning, logError } from "@/utils/logger";
 
 export interface WebSocketMessage {
     type: string;
@@ -287,7 +288,7 @@ export class WebSocketConnection {
                     .replace(/^http:\/\//, "ws://");
                 const url = `${wsUrl}/ws?user_id=${encodeURIComponent(this.server.user_id)}`;
 
-                console.log(`[WebSocket] Connecting to: ${url}`);
+                logInfo(`Connecting to WebSocket`, "websocket", `URL: ${url}`);
                 this.ws = new WebSocket(url);
 
                 // Set connection timeout
@@ -300,8 +301,10 @@ export class WebSocketConnection {
 
                 this.ws.onopen = () => {
                     clearTimeout(connectionTimeout);
-                    console.log(
-                        `[WebSocket] Connected to ${this.server.server_name}`,
+                    logInfo(
+                        `Connected to server`,
+                        "websocket",
+                        `Server: ${this.server.server_name}`,
                     );
                     this.connectionState = "connected";
                     this.reconnectAttempts = 0;
@@ -330,27 +333,24 @@ export class WebSocketConnection {
                             const message: WebSocketMessage = JSON.parse(
                                 event.data,
                             );
-                            console.log(
-                                `[WebSocket] Message received:`,
-                                message,
-                            );
                             this.handleMessage(message);
                         }
                         // Remove binary message handling
                     } catch (error) {
-                        console.error(
-                            `[WebSocket] Failed to parse message:`,
-                            error,
+                        logError(
+                            `Failed to parse WebSocket message`,
+                            "websocket",
+                            `Error: ${error}`,
                         );
                     }
                 };
 
                 this.ws.onclose = (event) => {
                     clearTimeout(connectionTimeout);
-                    console.log(
-                        `[WebSocket] Disconnected:`,
-                        event.code,
-                        event.reason,
+                    logInfo(
+                        `WebSocket disconnected`,
+                        "websocket",
+                        `Code: ${event.code}, Reason: ${event.reason}`,
                     );
                     this.connectionState = "disconnected";
                     this.stopPingMonitoring();
@@ -376,7 +376,11 @@ export class WebSocketConnection {
 
                 this.ws.onerror = (error) => {
                     clearTimeout(connectionTimeout);
-                    console.error(`[WebSocket] Error:`, error);
+                    logError(
+                        `WebSocket error occurred`,
+                        "websocket",
+                        `Error: ${error}`,
+                    );
                     this.connectionState = "disconnected";
                     reject(error);
                 };
@@ -393,8 +397,10 @@ export class WebSocketConnection {
             const timeSinceLastPing = Date.now() - this.lastPingTime;
             if (timeSinceLastPing > 70000) {
                 // 70 seconds without any message
-                console.warn(
-                    "[WebSocket] Connection appears dead, forcing reconnect",
+                logWarning(
+                    `Connection appears dead, forcing reconnect`,
+                    "websocket",
+                    `Time since last ping: ${timeSinceLastPing}ms`,
                 );
                 this.ws?.close();
             }
@@ -418,17 +424,21 @@ export class WebSocketConnection {
             this.maxReconnectDelay,
         );
 
-        console.log(
-            `[WebSocket] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`,
+        logInfo(
+            `Scheduling reconnection`,
+            "websocket",
+            `Delay: ${delay}ms, Attempt: ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`,
         );
 
         this.reconnectTimer = setTimeout(() => {
             this.reconnectAttempts++;
             this.connect().catch((error) => {
-                console.error(`[WebSocket] Reconnection failed:`, error);
+                logError(`Reconnection failed`, "websocket", `Error: ${error}`);
                 if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-                    console.error(
-                        `[WebSocket] Max reconnection attempts reached`,
+                    logError(
+                        `Max reconnection attempts reached`,
+                        "websocket",
+                        `Attempts: ${this.maxReconnectAttempts}`,
                     );
                 }
             });
@@ -451,7 +461,11 @@ export class WebSocketConnection {
             try {
                 handler(message);
             } catch (error) {
-                console.error(`[WebSocket] Handler error:`, error);
+                logError(
+                    `Message handler error`,
+                    "websocket",
+                    `Error: ${error}, Message type: ${message.type}`,
+                );
             }
         });
 
@@ -544,7 +558,11 @@ export class WebSocketConnection {
         if (this.ws?.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(message));
         } else {
-            console.warn(`[WebSocket] Cannot send message - not connected`);
+            logWarning(
+                `Cannot send message - not connected`,
+                "websocket",
+                `Message type: ${message.type}`,
+            );
         }
     }
 
@@ -593,8 +611,10 @@ export class WebSocketManager {
         }
 
         const connection = new WebSocketConnection(server, (connected) =>
-            console.log(
-                `[WebSocketManager] ${server.user_id} connection changed: ${connected}`,
+            logInfo(
+                `Connection status changed`,
+                "websocket",
+                `User: ${server.user_id}, Connected: ${connected}`,
             ),
         );
 
@@ -602,13 +622,16 @@ export class WebSocketManager {
 
         try {
             await connection.connect();
-            console.log(
-                `[WebSocketManager] Successfully connected ${server.user_id}`,
+            logInfo(
+                `Successfully connected server`,
+                "websocket",
+                `User ID: ${server.user_id}`,
             );
         } catch (error) {
-            console.error(
-                `[WebSocketManager] Failed to connect ${server.user_id}:`,
-                error,
+            logError(
+                `Failed to connect server`,
+                "websocket",
+                `User ID: ${server.user_id}, Error: ${error}`,
             );
             this.connections.delete(server.user_id);
             throw error;
@@ -620,7 +643,11 @@ export class WebSocketManager {
         if (connection) {
             connection.disconnect();
             this.connections.delete(userId);
-            console.log(`[WebSocketManager] Removed server for ${userId}`);
+            logInfo(
+                `Removed server connection`,
+                "websocket",
+                `User ID: ${userId}`,
+            );
         }
     }
 
@@ -628,12 +655,11 @@ export class WebSocketManager {
         const connection = this.connections.get(userId);
         if (connection) {
             connection.addMessageHandler(handler);
-            console.log(
-                `[WebSocketManager] Added message handler for ${userId}`,
-            );
         } else {
-            console.warn(
-                `[WebSocketManager] No connection found for ${userId}`,
+            logWarning(
+                `No connection found for user`,
+                "websocket",
+                `User ID: ${userId}`,
             );
         }
     }
@@ -642,9 +668,6 @@ export class WebSocketManager {
         const connection = this.connections.get(userId);
         if (connection) {
             connection.removeMessageHandler(handler);
-            console.log(
-                `[WebSocketManager] Removed message handler for ${userId}`,
-            );
         }
     }
 
@@ -698,7 +721,7 @@ export class WebSocketManager {
     disconnectAll() {
         this.connections.forEach((connection) => connection.disconnect());
         this.connections.clear();
-        console.log(`[WebSocketManager] Disconnected all connections`);
+        logInfo(`Disconnected all connections`, "websocket");
     }
 
     disconnect(userId: string) {
@@ -706,10 +729,12 @@ export class WebSocketManager {
         if (connection) {
             connection.disconnect();
             this.connections.delete(userId);
-            console.log(`[WebSocketManager] Disconnected ${userId}`);
+            logInfo(`Disconnected user`, "websocket", `User ID: ${userId}`);
         } else {
-            console.warn(
-                `[WebSocketManager] No connection found for ${userId}`,
+            logWarning(
+                `No connection found for disconnect`,
+                "websocket",
+                `User ID: ${userId}`,
             );
         }
     }

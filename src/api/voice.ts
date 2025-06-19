@@ -3,6 +3,7 @@ import { getSetting, SettingsInterface } from "@/utils/settings";
 import { WebSocketMessage } from "@/websocket/websocket-manager";
 import { VoiceParticipant } from "./server";
 import { apiRequest } from "./server";
+import { logWarning, logError } from "@/utils/logger";
 
 export interface VoiceJoinResponse {
     status: string;
@@ -164,7 +165,7 @@ export class VoiceAudioManager {
                 this.userVolumes = new Map(Object.entries(volumes));
             }
         } catch (error) {
-            console.warn("Failed to load user volumes:", error);
+            logWarning("Failed to load user volumes", "ui", String(error));
         }
     }
 
@@ -173,7 +174,7 @@ export class VoiceAudioManager {
             const volumes = Object.fromEntries(this.userVolumes);
             localStorage.setItem("voice_user_volumes", JSON.stringify(volumes));
         } catch (error) {
-            console.warn("Failed to save user volumes:", error);
+            logWarning("Failed to save user volumes", "ui", String(error));
         }
     }
 
@@ -686,7 +687,11 @@ export class VoiceClient {
         try {
             await this.api.leaveChannel(channelToLeave);
         } catch (error) {
-            console.error("Failed to leave voice channel via API:", error);
+            logError(
+                "Failed to leave voice channel via API",
+                "api",
+                String(error),
+            );
         } finally {
             this.cleanup();
         }
@@ -760,7 +765,7 @@ export class VoiceClient {
                 });
             }
         } catch (error) {
-            console.error("Failed to create WebRTC offer:", error);
+            logError("Failed to create WebRTC offer", "api", String(error));
             this.emit("connection_error", {
                 error: error instanceof Error ? error.message : String(error),
             });
@@ -774,7 +779,7 @@ export class VoiceClient {
     }): Promise<void> {
         const pc = this.audioManager.peerConnectionInstance;
         if (!pc) {
-            console.error("No peer connection available for answer");
+            logError("No peer connection available for answer", "api");
             return;
         }
 
@@ -786,7 +791,7 @@ export class VoiceClient {
 
             await pc.setRemoteDescription(answer);
         } catch (error) {
-            console.error("Failed to handle WebRTC answer:", error);
+            logError("Failed to handle WebRTC answer", "api", String(error));
             this.emit("connection_error", {
                 error: error instanceof Error ? error.message : String(error),
             });
@@ -803,7 +808,7 @@ export class VoiceClient {
     }): Promise<void> {
         const pc = this.audioManager.peerConnectionInstance;
         if (!pc) {
-            console.error("No peer connection available for ICE candidate");
+            logError("No peer connection available for ICE candidate", "api");
             return;
         }
 
@@ -816,7 +821,7 @@ export class VoiceClient {
 
             await pc.addIceCandidate(candidate);
         } catch (error) {
-            console.error("Failed to add ICE candidate:", error);
+            logError("Failed to add ICE candidate", "api", String(error));
         }
     }
 

@@ -38,6 +38,7 @@ import { webSocketManager } from "@/websocket/websocket-manager";
 import { leaveServer, getServerInfo, ServerInfo } from "@/api/server";
 import { toast } from "sonner";
 import { useConfirm } from "@/contexts/confirm-context";
+import { logInfo, logWarning, logError } from "@/utils/logger";
 
 interface ServerStatus {
     online: boolean;
@@ -117,7 +118,11 @@ export default function HomePage() {
                 return statusMap;
             }
         } catch (error) {
-            console.error("Failed to load cached server statuses:", error);
+            logError(
+                "Failed to load cached server statuses",
+                "api",
+                String(error),
+            );
         }
         return new Map<string, ServerStatus>();
     }, []);
@@ -132,9 +137,10 @@ export default function HomePage() {
                     JSON.stringify(cacheObj),
                 );
             } catch (error) {
-                console.error(
-                    "Failed to save server statuses to cache:",
-                    error,
+                logError(
+                    "Failed to save server statuses to cache",
+                    "api",
+                    String(error),
                 );
             }
         },
@@ -157,7 +163,7 @@ export default function HomePage() {
                 return retryMap;
             }
         } catch (error) {
-            console.error("Failed to load cached retry info:", error);
+            logError("Failed to load cached retry info", "api", String(error));
         }
         return new Map<string, ServerRetryInfo>();
     }, []);
@@ -172,7 +178,11 @@ export default function HomePage() {
                     JSON.stringify(cacheObj),
                 );
             } catch (error) {
-                console.error("Failed to save retry info to cache:", error);
+                logError(
+                    "Failed to save retry info to cache",
+                    "api",
+                    String(error),
+                );
             }
         },
         [],
@@ -312,7 +322,7 @@ export default function HomePage() {
                 });
                 setConnectionStates(initialConnectionStates);
             } catch (error) {
-                console.error("Failed to load servers:", error);
+                logError("Failed to load servers", "api", String(error));
             } finally {
                 setIsLoading(false);
             }
@@ -446,6 +456,11 @@ export default function HomePage() {
                         toast.warning(
                             "Failed to notify server, but removed locally",
                         );
+                        logWarning(
+                            "Failed to notify server on leave, removed locally",
+                            "api",
+                            String(error),
+                        );
                     }
                 }
 
@@ -483,7 +498,11 @@ export default function HomePage() {
                         );
                     }
                 } catch (error) {
-                    console.warn("Failed to clear server cache:", error);
+                    logWarning(
+                        "Failed to clear server cache",
+                        "api",
+                        String(error),
+                    );
                 }
 
                 if (!online) {
@@ -492,7 +511,7 @@ export default function HomePage() {
                     );
                 }
             } catch (error) {
-                console.error("Failed to leave server:", error);
+                logError("Failed to leave server", "api", String(error));
                 toast.error("Failed to leave server");
             } finally {
                 setLeavingServers((prev) => {
@@ -532,7 +551,11 @@ export default function HomePage() {
                     );
                 }
             } catch (error) {
-                console.error("Failed to process imported identities:", error);
+                logError(
+                    "Failed to process imported identities",
+                    "api",
+                    String(error),
+                );
                 toast.error("Failed to process imported identities");
             }
         },
@@ -563,9 +586,10 @@ export default function HomePage() {
                             maxUsers: serverInfo.max_users,
                         };
                     } catch (infoError) {
-                        console.warn(
-                            `Could not fetch server info for ${serverUrl}:`,
-                            infoError,
+                        logWarning(
+                            `Could not fetch server info for ${serverUrl}`,
+                            "api",
+                            String(infoError),
                         );
                         // Continue without metadata
                     }
@@ -579,9 +603,10 @@ export default function HomePage() {
 
                     successCount++;
                 } catch (error) {
-                    console.error(
-                        `Failed to restore identity ${identity.user_id}:`,
-                        error,
+                    logError(
+                        `Failed to restore identity ${identity.user_id}`,
+                        "api",
+                        String(error),
                     );
 
                     // If joining fails, still save the identity locally for manual connection later
@@ -592,9 +617,10 @@ export default function HomePage() {
                         );
                         successCount++;
                     } catch (saveError) {
-                        console.error(
-                            `Failed to save identity ${identity.user_id}:`,
-                            saveError,
+                        logError(
+                            `Failed to save identity ${identity.user_id}`,
+                            "api",
+                            String(saveError),
                         );
                         errorCount++;
                     }
@@ -660,8 +686,9 @@ export default function HomePage() {
             });
 
             if (serversToRetry.length > 0) {
-                console.log(
+                logInfo(
                     `Retrying ${serversToRetry.length} offline servers`,
+                    "api",
                 );
                 verifyServers(serversToRetry);
             }

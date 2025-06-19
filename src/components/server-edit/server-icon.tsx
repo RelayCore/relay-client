@@ -5,6 +5,7 @@ import { Upload, Download } from "lucide-react";
 import { uploadServerIcon } from "@/api/server";
 import { useServer, useServerRecord } from "@/contexts/server-context";
 import { toast } from "sonner";
+import { logError } from "@/utils/logger";
 
 interface ServerIconCropperProps {
     currentIcon?: string;
@@ -401,14 +402,18 @@ export function ServerIconCropper({
                         setSelectedImage(null);
                         onIconUpdated?.();
                     } catch (error) {
-                        console.error("Failed to upload server icon:", error);
+                        logError(
+                            "Failed to upload server icon",
+                            "api",
+                            String(error),
+                        );
                         toast.error("Failed to upload server icon");
                     }
                 }, "image/png");
             };
             img.src = selectedImage;
         } catch (error) {
-            console.error("Failed to process server icon:", error);
+            logError("Failed to process server icon", "api", String(error));
             toast.error("Failed to process server icon");
         } finally {
             setSaving(false);

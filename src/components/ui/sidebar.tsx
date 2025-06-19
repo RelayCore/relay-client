@@ -41,6 +41,7 @@ import {
 import { useShortcut } from "@/hooks/use-shortcut";
 import { useSetting } from "@/utils/settings";
 import { ScrollArea } from "./scroll-area";
+import { logError } from "@/utils/logger";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
@@ -802,9 +803,10 @@ function usePinnedItems(sectionTitle: string) {
                 setPinnedIds(JSON.parse(saved));
             }
         } catch (error) {
-            console.error(
+            logError(
                 "Failed to load pinned items from localStorage",
-                error,
+                "electron",
+                String(error),
             );
         }
     }, [storageKey]);
@@ -822,9 +824,10 @@ function usePinnedItems(sectionTitle: string) {
                         JSON.stringify(newPinnedIds),
                     );
                 } catch (error) {
-                    console.error(
+                    logError(
                         "Failed to save pinned items to localStorage",
-                        error,
+                        "electron",
+                        String(error),
                     );
                 }
 

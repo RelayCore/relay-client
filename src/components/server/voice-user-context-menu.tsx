@@ -35,6 +35,7 @@ import { useParams } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
 import { EditNicknameModal } from "./user-context-menu";
+import { logError } from "@/utils/logger";
 
 interface VoiceUserContextMenuProps {
     children: React.ReactNode;
@@ -111,7 +112,7 @@ export function VoiceUserContextMenu({
             await refreshServerData();
         } catch (error) {
             toast.error((error as Error).message || "Failed to assign role");
-            console.error("Error assigning role:", error);
+            logError("Error assigning role", "api", String(error));
         } finally {
             setIsLoading(false);
         }

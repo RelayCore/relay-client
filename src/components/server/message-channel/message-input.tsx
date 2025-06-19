@@ -70,8 +70,6 @@ export function MessageInput({
     const getFileKey = (file: File) =>
         `${file.name}-${file.size}-${file.lastModified}`;
 
-    console.log(serverInfo);
-
     return (
         <div
             className={

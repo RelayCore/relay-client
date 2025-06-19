@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/popover";
 import { Search, Smile, Loader2 } from "lucide-react";
 import { assetSrc } from "@/utils/assets";
+import { logError } from "@/utils/logger";
 
 interface EmojiData {
     emoji: string;
@@ -144,7 +145,7 @@ async function loadEmojiData(): Promise<EmojiCategories> {
         const content = await response.text();
         return parseEmojiTestFile(content);
     } catch (error) {
-        console.error("Error loading emoji data:", error);
+        logError("Error loading emoji data", "api", String(error));
         return {};
     }
 }
@@ -251,7 +252,7 @@ export const EmojiPopup = React.memo(function EmojiPopup({
                 const flat = Object.values(categories).flat();
                 setAllEmojis(flat);
             } catch (error) {
-                console.error("Failed to load emojis:", error);
+                logError("Failed to load emojis", "api", String(error));
             } finally {
                 setLoading(false);
             }

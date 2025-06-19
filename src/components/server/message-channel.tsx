@@ -39,6 +39,7 @@ import { MessageItem } from "./message-channel/message-item";
 import { MessageContentProcessor } from "./message-channel/message-content-processor";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageInput } from "./message-channel/message-input";
+import { logError, logWarning } from "@/utils/logger";
 
 export interface MessageChannelProps {
     channelId: number;
@@ -366,8 +367,9 @@ export default function MessageChannel({
 
         // Check write permissions before sending
         if (currentChannel && !canWriteToChannel(currentChannel, currentUser)) {
-            console.warn(
+            logWarning(
                 "User does not have permission to write in this channel",
+                "api",
             );
             return;
         }
@@ -397,7 +399,7 @@ export default function MessageChannel({
                 replyToId,
             );
         } catch (err) {
-            console.error("Failed to send message:", err);
+            logError("Failed to send message", "api", String(err));
             // Restore the message and files on error
             setMessageText(messageToSend);
             setSelectedFiles(filesToSend);
@@ -518,8 +520,9 @@ export default function MessageChannel({
                 currentChannel &&
                 !canWriteToChannel(currentChannel, currentUser)
             ) {
-                console.warn(
+                logWarning(
                     "User does not have permission to write in this channel",
+                    "api",
                 );
                 return;
             }
@@ -534,7 +537,7 @@ export default function MessageChannel({
                     gifUrl,
                 );
             } catch (err) {
-                console.error("Failed to send GIF:", err);
+                logError("Failed to send GIF", "api", String(err));
             } finally {
                 setSending(false);
             }
@@ -646,10 +649,11 @@ export default function MessageChannel({
             // Filter out files that are too large
             let validFiles = incomingFiles.filter((file) => {
                 if (file.size > maxSize) {
-                    console.warn(
+                    logWarning(
                         `File ${file.name} is too large (${formatFileSize(
                             file.size,
                         )}). Max size is ${formatFileSize(maxSize)}.`,
+                        "api",
                     );
                     return false;
                 }
@@ -662,13 +666,15 @@ export default function MessageChannel({
 
             if (validFiles.length > availableSlots) {
                 if (availableSlots <= 0) {
-                    console.warn(
+                    logWarning(
                         `Maximum number of files (${maxFiles}) already selected. No more files can be added.`,
+                        "api",
                     );
                     validFiles = [];
                 } else {
-                    console.warn(
+                    logWarning(
                         `Too many files selected. Only ${availableSlots} more files will be added. Max ${maxFiles} total.`,
+                        "api",
                     );
                     validFiles = validFiles.slice(0, availableSlots);
                 }
@@ -900,7 +906,7 @@ export default function MessageChannel({
             setEditingText("");
             toast.success("Message edited");
         } catch (error) {
-            console.error("Failed to edit message:", error);
+            logError("Failed to edit message", "api", String(error));
             toast.error("Failed to edit message");
         }
     };
@@ -1029,7 +1035,11 @@ export default function MessageChannel({
                     }
                 }, 100);
             } catch (error) {
-                console.error("Failed to load messages around target:", error);
+                logError(
+                    "Failed to load messages around target",
+                    "api",
+                    String(error),
+                );
                 toast.error("Failed to load message");
             } finally {
                 setLoadingMessageAround(false);

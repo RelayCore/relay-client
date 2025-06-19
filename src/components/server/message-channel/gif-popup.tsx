@@ -18,6 +18,7 @@ import {
 import { useServer } from "@/contexts/server-context";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { getLocalStorageItem } from "@/utils/localstorage";
+import { logError } from "@/utils/logger";
 
 interface GifPopupProps {
     onGifSelect: (gifUrl: string) => void;
@@ -68,7 +69,7 @@ export const GifPopup = React.memo(function GifPopup({
                 );
                 setGifs(response.results);
             } catch (error) {
-                console.error("Failed to load trending GIFs:", error);
+                logError("Failed to load trending GIFs", "api", String(error));
             } finally {
                 setLoading(false);
             }
@@ -97,7 +98,7 @@ export const GifPopup = React.memo(function GifPopup({
                 );
                 setAttachments(response.attachments);
             } catch (error) {
-                console.error("Failed to load attachments:", error);
+                logError("Failed to load attachments", "api", String(error));
             } finally {
                 setLoading(false);
             }
@@ -116,7 +117,7 @@ export const GifPopup = React.memo(function GifPopup({
                 const stored = getLocalStorageItem("starred-images") || [];
                 setStarredImages(stored);
             } catch (error) {
-                console.error("Failed to load starred images:", error);
+                logError("Failed to load starred images", "api", String(error));
                 setStarredImages([]);
             } finally {
                 setLoading(false);
@@ -152,7 +153,7 @@ export const GifPopup = React.memo(function GifPopup({
                 setGifs(response.results);
                 setViewMode("search");
             } catch (error) {
-                console.error("Failed to search GIFs:", error);
+                logError("Failed to search GIFs", "api", String(error));
             } finally {
                 setLoading(false);
             }
