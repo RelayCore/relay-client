@@ -19,6 +19,7 @@ export interface ServerRecord {
     server_allow_invite?: boolean;
     server_max_users?: number;
     server_icon?: string;
+    last_modified?: string;
 }
 
 export interface UserIdentity {
@@ -65,6 +66,10 @@ export async function loadServers(): Promise<ServerRecord[]> {
 }
 
 export async function saveServers(servers: ServerRecord[]) {
+    const now = new Date().toISOString();
+    for (const server of servers) {
+        server.last_modified = now;
+    }
     const filePath = await getFilePath();
     await window.fileSystem.writeFile(
         filePath,
@@ -81,6 +86,7 @@ export async function addServer(server: ServerRecord) {
             s.server_url === server.server_url && s.user_id === server.user_id,
     );
     if (!existing && serverCache) {
+        server.last_modified = new Date().toISOString();
         serverCache.push(server);
         await saveServers(serverCache);
         // Trigger a custom event to notify components that servers have changed
@@ -270,6 +276,7 @@ export async function restoreIdentityToServer(
         server_allow_invite: serverMetadata?.allowInvite,
         server_max_users: serverMetadata?.maxUsers,
         server_icon: serverMetadata?.icon,
+        last_modified: new Date().toISOString(),
     };
 
     await addServer(serverRecord);
