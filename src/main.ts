@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, ipcMain } from "electron";
+import { app, BrowserWindow, protocol, ipcMain, session } from "electron";
 import registerListeners from "./helpers/ipc/listeners-register";
 import path from "path";
 import fs from "fs";
@@ -176,6 +176,31 @@ app.whenReady().then(async () => {
     ipcMain.on("app-loading-complete", () => {
         manuallyCompleted = true;
         tryShowMainWindow();
+    });
+
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+        const responseHeaders = details.responseHeaders || {};
+
+        // Modify Set-Cookie headers to set SameSite=None for cross-site compatibility
+        if (responseHeaders["set-cookie"]) {
+            responseHeaders["set-cookie"] = responseHeaders["set-cookie"].map(
+                (cookie) => {
+                    let modifiedCookie = cookie.replace(
+                        /;\s*SameSite=(Lax|Strict|None)/gi,
+                        "",
+                    );
+
+                    modifiedCookie += "; SameSite=None";
+                    if (!modifiedCookie.includes("Secure")) {
+                        modifiedCookie += "; Secure";
+                    }
+
+                    return modifiedCookie;
+                },
+            );
+        }
+
+        callback({ responseHeaders });
     });
 
     protocol.handle(imageProtocolName, async (request) => {

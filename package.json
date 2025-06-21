@@ -94,6 +94,7 @@
         "@vitejs/plugin-react": "^4.3.4",
         "axios": "^1.9.0",
         "babel-plugin-react-compiler": "^19.0.0-beta-714736e-20250131",
+        "better-auth": "^1.2.9",
         "chokidar": "^4.0.3",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",

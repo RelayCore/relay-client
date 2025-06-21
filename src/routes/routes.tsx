@@ -2,6 +2,7 @@ import { createRoute } from "@tanstack/react-router";
 import { RootRoute } from "./__root";
 import HomePage from "@/pages/home-page";
 import SettingsPage from "@/pages/settings-page";
+import IdentityPage from "@/pages/identity-page";
 import NotFoundPage from "@/pages/not-found-page";
 import ServerPage from "@/pages/server-page";
 import ServerEditPage from "@/pages/server-edit-page";
@@ -55,10 +56,17 @@ export const ServerEditRoute = createRoute({
     component: ServerEditPage,
 });
 
+export const IdentityRoute = createRoute({
+    getParentRoute: () => RootRoute,
+    path: "/identity",
+    component: IdentityPage,
+});
+
 export const rootTree = RootRoute.addChildren([
     HomeRoute,
     SettingsRoute,
     ServerRoute,
     ServerEditRoute,
+    IdentityRoute,
     NotFoundRoute,
 ]);

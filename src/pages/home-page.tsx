@@ -18,6 +18,7 @@ import {
     Upload,
     FileDown,
     FileUp,
+    Cloud,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -723,8 +724,15 @@ export default function HomePage() {
                                       servers.length === 1 ? "" : "s"
                                   }`}
                         </p>
-                    </div>
+                    </div>{" "}
                     <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => navigate({ to: "/identity" })}
+                        >
+                            <Cloud className="mr-2 h-4 w-4" />
+                            Sync Identities
+                        </Button>
                         <Button
                             variant="outline"
                             onClick={() => setImportDialogOpen(true)}
