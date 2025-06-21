@@ -15,6 +15,7 @@ import { handleImageRequest, handleVideoRequest } from "./files";
 import { cleanupFileWatchers } from "./helpers/ipc/file/file-listeners";
 import { webSocketManager } from "./websocket/websocket-manager";
 import { ogCache } from "./helpers/ipc/og/og-listeners";
+import { startIdentitySyncScheduler } from "./storage/server-store";
 
 dotenv.config();
 
@@ -310,6 +311,8 @@ app.whenReady().then(async () => {
     console.log(
         `OG cache stats: ${stats.totalFiles} files, ${(stats.totalSize / 1024).toFixed(2)} KB`,
     );
+
+    startIdentitySyncScheduler();
 
     // If loading window is disabled, show main window immediately when it's ready
     if (!APP_CONFIG.useLoadingWindow) {

@@ -1,5 +1,7 @@
 import QRCode from "qrcode";
 
+let syncInterval: NodeJS.Timeout | null = null;
+
 const getFilePath = async (): Promise<string> => {
     const systemPaths = await window.fileSystem.getSystemPaths();
     return `${systemPaths.data?.userData}/servers.json`;
@@ -525,4 +527,60 @@ export async function syncIdentitiesWithServer(
 ): Promise<void> {
     await pullServerIdentitiesToLocal(serverUrl);
     await pushLocalIdentitiesToServer(serverUrl);
+}
+
+/**
+ * Start the identity sync scheduler that runs on startup and every hour.
+ */
+export function startIdentitySyncScheduler(): void {
+    // Clear any existing interval
+    if (syncInterval) {
+        clearInterval(syncInterval);
+    }
+
+    // Run initial sync on startup
+    performScheduledSync();
+
+    // Set up hourly sync
+    syncInterval = setInterval(
+        () => {
+            performScheduledSync();
+        },
+        60 * 60 * 1000,
+    ); // 1 hour in milliseconds
+}
+
+/**
+ * Stop the identity sync scheduler.
+ */
+export function stopIdentitySyncScheduler(): void {
+    if (syncInterval) {
+        clearInterval(syncInterval);
+        syncInterval = null;
+    }
+}
+
+/**
+ * Perform sync with all servers that have identities stored locally.
+ */
+async function performScheduledSync(): Promise<void> {
+    try {
+        const servers = await loadServers();
+
+        // Get unique server URLs
+        const serverUrls = [...new Set(servers.map((s) => s.server_url))];
+
+        for (const serverUrl of serverUrls) {
+            try {
+                await syncIdentitiesWithServer(serverUrl);
+            } catch (error) {
+                console.error(
+                    `Failed to sync with server ${serverUrl}:`,
+                    error,
+                );
+            }
+        }
+    } catch (error) {
+        console.error("Error during scheduled identity sync:", error);
+    }
 }
