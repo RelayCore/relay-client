@@ -13,7 +13,10 @@ export type OGData = {
     url: string;
 };
 
-export type DisabledFeature = "imageLinks" | "openGraphPreviews";
+export type DisabledFeature =
+    | "imageLinks"
+    | "openGraphPreviews"
+    | "youTubeEmbeds";
 
 /**
  * Component for rendering processed message content
@@ -54,6 +57,27 @@ export function ProcessedMessageContent({
                         );
                     case "link": {
                         const linkData = part.data;
+
+                        // Handle YouTube links
+                        if (
+                            linkData?.isYouTubeLink &&
+                            linkData.youTubeId &&
+                            !isFeatureDisabled("youTubeEmbeds")
+                        ) {
+                            return (
+                                <React.Fragment key={index}>
+                                    <LinkSpan
+                                        content={part.content}
+                                        url={linkData?.url}
+                                    />
+                                    <YouTubeEmbed
+                                        youTubeId={linkData.youTubeId}
+                                        onContentLoad={onContentLoad}
+                                    />
+                                </React.Fragment>
+                            );
+                        }
+
                         if (
                             linkData?.isImageLink &&
                             linkData.url &&
@@ -303,5 +327,108 @@ function OpenGraphPreviewSpan({
                 </div>
             </div>
         </a>
+    );
+}
+
+/**
+ * Component for rendering YouTube video embeds
+ */
+function YouTubeEmbed({
+    youTubeId,
+    onContentLoad,
+}: {
+    youTubeId: string;
+    onContentLoad?: () => void;
+}) {
+    const [videoData, setVideoData] = React.useState<{
+        title?: string;
+        author_name?: string;
+        thumbnail_url?: string;
+        loading: boolean;
+        error?: string;
+    }>({ loading: true });
+
+    React.useEffect(() => {
+        const fetchVideoData = async () => {
+            try {
+                const response = await fetch(
+                    `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${youTubeId}&format=json`,
+                );
+
+                if (response.ok) {
+                    const data = await response.json();
+                    setVideoData({
+                        title: data.title,
+                        author_name: data.author_name,
+                        thumbnail_url: data.thumbnail_url,
+                        loading: false,
+                    });
+                } else {
+                    setVideoData({
+                        loading: false,
+                        error: "Failed to fetch video data",
+                    });
+                }
+            } catch {
+                setVideoData({
+                    loading: false,
+                    error: "Failed to fetch video data",
+                });
+            }
+        };
+
+        fetchVideoData();
+    }, [youTubeId]);
+
+    const youtubeUrl = `https://www.youtube.com/watch?v=${youTubeId}`;
+
+    return (
+        <div className="my-2 mr-12 max-w-xl">
+            <a
+                href={youtubeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:bg-muted/50 text-foreground block rounded-lg border p-3 text-sm no-underline transition-colors"
+            >
+                {/* Video metadata header */}
+                <div className="mb-2">
+                    {videoData.loading ? (
+                        <div className="text-muted-foreground text-sm">
+                            Loading video info...
+                        </div>
+                    ) : videoData.error ? (
+                        <div className="text-primary text-sm font-semibold">
+                            YouTube Video
+                        </div>
+                    ) : (
+                        <>
+                            <div
+                                className="text-primary line-clamp-2 font-semibold"
+                                title={videoData.title}
+                            >
+                                {videoData.title}
+                            </div>
+                            {videoData.author_name && (
+                                <div className="text-muted-foreground mt-1 text-xs">
+                                    by {videoData.author_name}
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                {/* Video embed */}
+                <div className="relative aspect-video w-full overflow-hidden rounded border">
+                    <iframe
+                        src={`https://www.youtube.com/embed/${youTubeId}`}
+                        title={videoData.title || "YouTube video"}
+                        className="absolute inset-0 h-full w-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        onLoad={() => onContentLoad?.()}
+                    />
+                </div>
+            </a>
+        </div>
     );
 }

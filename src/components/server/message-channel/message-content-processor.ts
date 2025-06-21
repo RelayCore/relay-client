@@ -9,6 +9,8 @@ export type MessageContentPart = {
         tagName?: string;
         emojiCode?: string;
         isImageLink?: boolean; // Added for image link detection
+        isYouTubeLink?: boolean; // Added for YouTube detection
+        youTubeId?: string; // Added for YouTube video ID
     };
 };
 
@@ -152,12 +154,22 @@ export class MessageContentProcessor {
             // Check if the URL is an image link (case-insensitive, before query parameters)
             const isImage = /\.(jpeg|jpg|gif|png|webp|bmp)$/i.test(
                 url.split("?")[0],
-            );
+            ); // Check if the URL is a YouTube link and extract the video ID if so
+            const youTubeRegex =
+                /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+            const youTubeMatch = url.match(youTubeRegex);
+            const isYouTubeLink = youTubeMatch !== null;
+            const youTubeId = isYouTubeLink ? youTubeMatch[1] : undefined;
 
             parts.push({
                 type: "link",
                 content: fullMatch, // Display the original matched string
-                data: { url: url, isImageLink: isImage }, // Set isImageLink
+                data: {
+                    url: url,
+                    isImageLink: isImage, // Set isImageLink
+                    isYouTubeLink: isYouTubeLink, // Set isYouTubeLink
+                    youTubeId: youTubeId, // Set youTubeId
+                },
             });
 
             lastIndex = startIndex + fullMatch.length;

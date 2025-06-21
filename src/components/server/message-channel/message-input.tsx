@@ -198,6 +198,7 @@ export function MessageInput({
                                 disabledFeatures={[
                                     "imageLinks",
                                     "openGraphPreviews",
+                                    "youTubeEmbeds",
                                 ]}
                             />
                         </div>
