@@ -15,6 +15,8 @@ import { handleImageRequest, handleVideoRequest } from "./files";
 import { cleanupFileWatchers } from "./helpers/ipc/file/file-listeners";
 import { webSocketManager } from "./websocket/websocket-manager";
 import { ogCache } from "./helpers/ipc/og/og-listeners";
+import { ElectronBlocker } from "@ghostery/adblocker-electron";
+import fetch from "cross-fetch";
 
 dotenv.config();
 
@@ -41,6 +43,10 @@ protocol.registerSchemesAsPrivileged([
         },
     },
 ]);
+
+ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((blocker) => {
+    blocker.enableBlockingInSession(session.defaultSession);
+});
 
 // Global reference to windows to avoid garbage collection
 let mainWindow: BrowserWindow | null = null;
