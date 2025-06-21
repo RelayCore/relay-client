@@ -468,13 +468,13 @@ export async function pullServerIdentitiesToLocal(
             // Use the conversion helper
             await restoreIdentityToServer(
                 serverIdentityToUserIdentity(identity),
-                serverUrl,
+                identity.server_url,
             );
         } else if (isNewer(serverUpdatedAt, localLastModified)) {
-            await removeServer(serverUrl, local.user_id);
+            await removeServer(identity.server_url, local.user_id);
             await restoreIdentityToServer(
                 serverIdentityToUserIdentity(identity),
-                serverUrl,
+                identity.server_url,
             );
         }
     }
