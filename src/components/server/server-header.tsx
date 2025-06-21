@@ -27,7 +27,6 @@ import {
     MessageSearchResponse,
     hasPermission,
 } from "@/api/server";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { logError } from "@/utils/logger";
@@ -342,7 +341,7 @@ function SearchPopup({
                 </div>
             </div>
 
-            <ScrollArea className="max-h-80">
+            <div className="max-h-80 overflow-y-auto">
                 {searchResults.length > 0 ? (
                     <div className="space-y-4">
                         {searchResults.map((message) => (
@@ -369,7 +368,7 @@ function SearchPopup({
                         </p>
                     </div>
                 ) : null}
-            </ScrollArea>
+            </div>
         </div>
     );
 }

@@ -7,7 +7,6 @@ import {
 } from "@/api/server";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
     Pin,
@@ -132,7 +131,7 @@ export function PinnedPopup({
                 </div>
             </div>
 
-            <ScrollArea className="max-h-96">
+            <div className="max-h-80 overflow-y-auto">
                 <div className="space-y-4">
                     {pinnedMessages.map((message) => (
                         <PinnedMessageItem
@@ -142,7 +141,7 @@ export function PinnedPopup({
                         />
                     ))}
                 </div>
-            </ScrollArea>
+            </div>
         </div>
     );
 }
