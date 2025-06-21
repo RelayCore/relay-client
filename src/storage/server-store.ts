@@ -1,3 +1,4 @@
+import { log } from "@/utils/logger";
 import QRCode from "qrcode";
 
 let syncInterval: NodeJS.Timeout | null = null;
@@ -461,6 +462,13 @@ export async function pullServerIdentitiesToLocal(
     const localServers = await loadServers();
     const localById = new Map(localServers.map((s) => [s.identity_id, s]));
 
+    log(
+        "Found identities on server",
+        "info",
+        "sync",
+        JSON.stringify(serverIdentities, null, 2),
+    );
+
     for (const identity of serverIdentities) {
         const local = localById.get(identity.identity_id);
         const serverUpdatedAt = identity.updated_at || identity.created_at;
@@ -492,6 +500,13 @@ export async function pushLocalIdentitiesToServer(
     const serverIdentities: ServerIdentity[] =
         await fetchServerIdentities(serverUrl);
     const serverById = new Map(serverIdentities.map((i) => [i.identity_id, i]));
+
+    log(
+        "Found identities locally",
+        "info",
+        "sync",
+        JSON.stringify(localServers, null, 2),
+    );
 
     for (const local of localServers) {
         const server = serverById.get(local.identity_id);
@@ -525,26 +540,23 @@ export async function pushLocalIdentitiesToServer(
 export async function syncIdentitiesWithServer(
     serverUrl: string,
 ): Promise<void> {
-    await pullServerIdentitiesToLocal(serverUrl);
+    log("Syncing identities with server", "info", "sync");
     await pushLocalIdentitiesToServer(serverUrl);
 }
 
 /**
  * Start the identity sync scheduler that runs on startup and every hour.
  */
-export function startIdentitySyncScheduler(): void {
-    // Clear any existing interval
+export function startIdentitySyncScheduler(serverUrl: string): void {
     if (syncInterval) {
         clearInterval(syncInterval);
     }
-
-    // Run initial sync on startup
-    performScheduledSync();
+    syncIdentitiesWithServer(serverUrl);
 
     // Set up hourly sync
     syncInterval = setInterval(
         () => {
-            performScheduledSync();
+            syncIdentitiesWithServer(serverUrl);
         },
         60 * 60 * 1000,
     ); // 1 hour in milliseconds
@@ -557,30 +569,5 @@ export function stopIdentitySyncScheduler(): void {
     if (syncInterval) {
         clearInterval(syncInterval);
         syncInterval = null;
-    }
-}
-
-/**
- * Perform sync with all servers that have identities stored locally.
- */
-async function performScheduledSync(): Promise<void> {
-    try {
-        const servers = await loadServers();
-
-        // Get unique server URLs
-        const serverUrls = [...new Set(servers.map((s) => s.server_url))];
-
-        for (const serverUrl of serverUrls) {
-            try {
-                await syncIdentitiesWithServer(serverUrl);
-            } catch (error) {
-                console.error(
-                    `Failed to sync with server ${serverUrl}:`,
-                    error,
-                );
-            }
-        }
-    } catch (error) {
-        console.error("Error during scheduled identity sync:", error);
     }
 }

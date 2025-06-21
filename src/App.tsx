@@ -5,6 +5,10 @@ import { router } from "./routes/router";
 import { RouterProvider } from "@tanstack/react-router";
 import { loadingManager } from "./helpers/loading-manager";
 import { log } from "./utils/logger";
+import {
+    startIdentitySyncScheduler,
+    stopIdentitySyncScheduler,
+} from "./storage/server-store";
 
 export default function App() {
     const [appReady, setAppReady] = useState(false);
@@ -23,6 +27,9 @@ export default function App() {
 
                 // Mark app as ready
                 setAppReady(true);
+                startIdentitySyncScheduler(
+                    localStorage.getItem("authBaseURL") || "",
+                );
 
                 // Signal the loading window that app is ready to be displayed
                 // Use a small timeout to ensure the loadingManager is fully initialized
@@ -43,6 +50,10 @@ export default function App() {
         };
 
         initialize();
+
+        return () => {
+            stopIdentitySyncScheduler();
+        };
     }, []);
 
     // Optional: Show a fallback while initializing
