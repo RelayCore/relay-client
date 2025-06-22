@@ -5,7 +5,11 @@ import path from "path";
 export default defineConfig({
     build: {
         rollupOptions: {
-            external: ["update-electron-app", "electron-squirrel-startup"],
+            external: [
+                "update-electron-app",
+                "electron-squirrel-startup",
+                "@ghostery/adblocker-electron",
+            ],
         },
         chunkSizeWarningLimit: 1600,
     },
