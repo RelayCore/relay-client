@@ -20,23 +20,10 @@ export const APP_CONFIG = {
  */
 export const inDevelopment = process.env.NODE_ENV === "development";
 
-interface AppSettings {
-    [key: string]: {
-        label: string;
-        settings: {
-            [key: string]:
-                | Setting
-                | {
-                      customRender: boolean;
-                  };
-        };
-    };
-}
-
 /**
  * Application settings configuration with categorized groups
  */
-export const APP_SETTINGS: AppSettings = {
+export const APP_SETTINGS = {
     general: {
         label: "General",
         settings: {
@@ -242,4 +229,11 @@ export const APP_SETTINGS: AppSettings = {
             },
         },
     },
+} as const satisfies {
+    [key: string]: {
+        label: string;
+        settings: {
+            [key: string]: Setting | { customRender: boolean };
+        };
+    };
 };

@@ -26,6 +26,11 @@ import { RotateCcw } from "lucide-react";
 import { APP_SETTINGS } from "@/config";
 
 type AppSettingsCategories = typeof APP_SETTINGS;
+type ExtractSettingKeys<T> = T extends { settings: infer S } ? keyof S : never;
+type AllSettingKeys = ExtractSettingKeys<
+    AppSettingsCategories[keyof AppSettingsCategories]
+>;
+
 type CategoryKeys = keyof AppSettingsCategories;
 type SettingsByCategory<T extends CategoryKeys> =
     AppSettingsCategories[T]["settings"];
@@ -152,7 +157,7 @@ export function useSettingsChange(
  * // theme will automatically update when the theme setting changes
  * ```
  */
-export function useSetting<K extends keyof SettingsInterface>(
+export function useSetting<K extends AllSettingKeys>(
     key: K,
 ): SettingsInterface[K] {
     const [value, setValue] = React.useState<SettingsInterface[K]>(
@@ -174,7 +179,7 @@ export function useSetting<K extends keyof SettingsInterface>(
  * @param key - The setting key to retrieve from the settings object
  * @returns The value of the specified setting key if found in localStorage, the default value if the key exists in defaultSettings, or null if neither exists or if running server-side
  */
-export function getSetting<K extends keyof SettingsInterface>(
+export function getSetting<K extends AllSettingKeys>(
     key: K,
 ): SettingsInterface[K] {
     const storedSetting = localStorage.getItem("settings");
@@ -191,7 +196,7 @@ export function getSetting<K extends keyof SettingsInterface>(
  * @param keys - Array of setting keys to retrieve
  * @returns Object containing the requested settings with their values
  */
-export function getSettings<K extends keyof SettingsInterface>(keys: K[]) {
+export function getSettings<K extends AllSettingKeys>(keys: K[]) {
     if (typeof window === "undefined") return null;
 
     const storedSettings = localStorage.getItem("settings");
