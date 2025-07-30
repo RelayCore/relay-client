@@ -42,6 +42,14 @@ export const APP_SETTINGS = {
                 description: "Choose the theme for the application",
                 groups: ["Appearance"],
             },
+            ogBorderColor: {
+                label: "Link Preview Border Color",
+                type: "checkbox",
+                default: true,
+                description:
+                    "Determine if link previews should have a border color based on the theme color of the page",
+                groups: ["Appearance", "Color"],
+            },
             positiveAccentColor: {
                 label: "Positive Accent Color",
                 type: "color",

@@ -4,14 +4,7 @@ import { Attachment, User } from "@/api/server";
 import { UserPopover } from "../user-popup";
 import { MessageContentPart } from "./message-content-processor";
 import { AttachmentItem } from "./attachment-item";
-
-export type OGData = {
-    title?: string;
-    description?: string;
-    imageUrl?: string;
-    siteName?: string;
-    url: string;
-};
+import { useSetting } from "@/utils/settings";
 
 export type DisabledFeature =
     | "imageLinks"
@@ -62,7 +55,8 @@ export function ProcessedMessageContent({
                         if (
                             linkData?.isYouTubeLink &&
                             linkData.youTubeId &&
-                            !isFeatureDisabled("youTubeEmbeds")
+                            !isFeatureDisabled("youTubeEmbeds") &&
+                            linkData.url
                         ) {
                             return (
                                 <React.Fragment key={index}>
@@ -260,7 +254,9 @@ function OpenGraphPreviewSpan({
     ) => void;
     onContentLoad?: () => void; // Add this prop
 }) {
-    const { title, description, imageUrl, siteName, url: ogUrl } = ogData;
+    const { title, description, imageUrl, url: ogUrl, themeColor } = ogData;
+    const [imgError, setImgError] = React.useState(false);
+    const borderColor = useSetting("ogBorderColor") ? themeColor : undefined;
 
     const handleImageClick = (e: React.MouseEvent) => {
         if (imageUrl && onImageClick) {
@@ -291,14 +287,10 @@ function OpenGraphPreviewSpan({
             target="_blank"
             rel="noopener noreferrer"
             className="hover:bg-muted/50 text-foreground my-2 mr-12 block max-w-xl rounded-lg border p-3 text-sm no-underline transition-colors"
+            style={{ borderColor: borderColor }}
         >
-            {siteName && (
-                <div className="text-muted-foreground mb-1 text-xs font-medium">
-                    {siteName}
-                </div>
-            )}
             <div className={cn("flex gap-3", !imageUrl && "flex-col")}>
-                {imageUrl && (
+                {imageUrl && !imgError && (
                     <div className="w-auto flex-shrink-0">
                         <img
                             src={imageUrl}
@@ -306,9 +298,7 @@ function OpenGraphPreviewSpan({
                             className="h-auto max-h-[98px] w-full cursor-pointer rounded border object-contain transition-opacity hover:opacity-80"
                             onClick={handleImageClick}
                             onLoad={() => onContentLoad?.()} // Trigger scroll when image loads
-                            onError={(e) =>
-                                (e.currentTarget.style.display = "none")
-                            }
+                            onError={() => setImgError(true)}
                         />
                     </div>
                 )}
@@ -381,6 +371,7 @@ function YouTubeEmbed({
     }, [youTubeId]);
 
     const youtubeUrl = `https://www.youtube.com/watch?v=${youTubeId}`;
+    const borderColor = useSetting("ogBorderColor") ? "#ff0033" : undefined;
 
     return (
         <div className="my-2 mr-12 max-w-xl">
@@ -389,6 +380,7 @@ function YouTubeEmbed({
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:bg-muted/50 text-foreground block rounded-lg border p-3 text-sm no-underline transition-colors"
+                style={{ borderColor: borderColor }}
             >
                 {/* Video metadata header */}
                 <div className="mb-2">

@@ -6,7 +6,7 @@ import { useMembers } from "@/contexts/server-context";
 import { UserPopover } from "../user-popup";
 import { UserAvatar } from "../user-avatar";
 import { AttachmentItem } from "./attachment-item";
-import { ProcessedMessageContent, OGData } from "./message-content";
+import { ProcessedMessageContent } from "./message-content";
 import { MessageContentProcessor } from "./message-content-processor";
 import { ReplyPreview } from "./reply-preview";
 import { logError } from "@/utils/logger";
@@ -205,6 +205,7 @@ export function MessageItem({
                                 description: meta.description || "",
                                 imageUrl: meta.imageUrl || "",
                                 siteName: meta.title || "",
+                                themeColor: meta.themeColor || "",
                                 url,
                             },
                         }));

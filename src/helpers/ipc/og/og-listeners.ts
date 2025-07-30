@@ -5,14 +5,6 @@ import { parse } from "node-html-parser";
 import { FETCH_META_CHANNEL } from "./og-channels";
 import { OGCache } from "./og-cache";
 
-interface OGData {
-    title?: string;
-    description?: string;
-    imageUrl?: string;
-    siteName?: string;
-    url: string;
-}
-
 const ogCache = new OGCache();
 
 function extractMetaTags(html: string, url: string): OGData {
@@ -27,7 +19,19 @@ function extractMetaTags(html: string, url: string): OGData {
             const element = root.querySelector(
                 `meta[${attribute}="${property}"]`,
             );
-            return element?.getAttribute("content") || "";
+            if (element) return element.getAttribute("content") || "";
+
+            const metas = root.querySelectorAll("meta");
+            for (const meta of metas) {
+                const attrVal = meta.getAttribute(attribute);
+                if (
+                    attrVal &&
+                    attrVal.toLowerCase() === property.toLowerCase()
+                ) {
+                    return meta.getAttribute("content") || "";
+                }
+            }
+            return "";
         };
 
         // Get Open Graph data
@@ -50,11 +54,16 @@ function extractMetaTags(html: string, url: string): OGData {
             getMeta("twitter:site") ||
             new URL(url).hostname;
 
+        const themeColor =
+            getMeta("theme-color", "name") ||
+            getMeta("theme-color", "property");
+
         return {
             title: title.trim(),
             description: description.trim(),
             imageUrl: imageUrl.trim(),
             siteName: siteName.trim(),
+            themeColor: themeColor.trim(),
             url,
         };
     } catch (error) {
@@ -112,6 +121,7 @@ export function addOGEventListeners() {
                         description: cachedData.description,
                         imageUrl: cachedData.imageUrl,
                         siteName: cachedData.siteName,
+                        themeColor: cachedData.themeColor,
                         url: cachedData.url,
                     };
                 }

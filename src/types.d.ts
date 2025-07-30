@@ -192,6 +192,7 @@ interface OGData {
     description?: string;
     imageUrl?: string;
     siteName?: string;
+    themeColor?: string;
     url: string;
 }
 

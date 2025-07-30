@@ -3,12 +3,7 @@ import path from "path";
 import { app } from "electron";
 import crypto from "crypto";
 
-interface CachedOGData {
-    title?: string;
-    description?: string;
-    imageUrl?: string;
-    siteName?: string;
-    url: string;
+interface CachedOGData extends OGData {
     cachedAt: number;
     lastAccessed: number;
 }
@@ -87,7 +82,7 @@ export class OGCache {
 
             await fs.promises.writeFile(
                 filePath,
-                JSON.stringify(cacheData, null, 2),
+                JSON.stringify(cacheData, null),
             );
         } catch (error) {
             console.error("Error writing OG cache:", error);
