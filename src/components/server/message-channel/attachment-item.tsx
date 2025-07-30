@@ -14,14 +14,14 @@ import { cn } from "@/utils/tailwind";
 export function AttachmentItem({
     attachment,
     onImageClick,
-    onContentLoad, // Add this prop
+    onContentLoad,
 }: {
     attachment: Attachment;
     onImageClick?: (
         attachment: Attachment,
         sourceElement?: HTMLElement,
     ) => void;
-    onContentLoad?: () => void; // Add this prop
+    onContentLoad?: () => void;
 }) {
     const isImage = attachment.type === "image";
     const isVideo = attachment.type === "video";

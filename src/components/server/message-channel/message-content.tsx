@@ -20,7 +20,7 @@ export function ProcessedMessageContent({
     ogDataMap,
     onImageClick,
     disabledFeatures = [],
-    onContentLoad, // Add this prop
+    onContentLoad,
 }: {
     parts: MessageContentPart[];
     currentUserId?: string;
@@ -30,7 +30,7 @@ export function ProcessedMessageContent({
         sourceElement?: HTMLElement,
     ) => void;
     disabledFeatures?: DisabledFeature[];
-    onContentLoad?: () => void; // Add this prop
+    onContentLoad?: () => void;
 }) {
     const isFeatureDisabled = (feature: DisabledFeature) =>
         disabledFeatures.includes(feature);
@@ -51,7 +51,6 @@ export function ProcessedMessageContent({
                     case "link": {
                         const linkData = part.data;
 
-                        // Handle YouTube links
                         if (
                             linkData?.isYouTubeLink &&
                             linkData.youTubeId &&
@@ -83,7 +82,7 @@ export function ProcessedMessageContent({
                                     content={part.content}
                                     url={linkData.url}
                                     onImageClick={onImageClick}
-                                    onContentLoad={onContentLoad} // Pass callback
+                                    onContentLoad={onContentLoad}
                                 />
                             );
                         }
@@ -105,12 +104,12 @@ export function ProcessedMessageContent({
                                         ogData={ogEntry}
                                         originalUrlText={part.content}
                                         onImageClick={onImageClick}
-                                        onContentLoad={onContentLoad} // Pass callback
+                                        onContentLoad={onContentLoad}
                                     />
                                 </React.Fragment>
                             );
                         }
-                        // Fallback to simple link if no OG data, or if status is loading/error/nodata
+
                         return (
                             <LinkSpan
                                 key={index}
@@ -202,7 +201,7 @@ function ImageLinkAttachment({
     content,
     url,
     onImageClick,
-    onContentLoad, // Add this prop
+    onContentLoad,
 }: {
     content: string;
     url: string;
@@ -210,9 +209,8 @@ function ImageLinkAttachment({
         attachment: Attachment,
         sourceElement?: HTMLElement,
     ) => void;
-    onContentLoad?: () => void; // Add this prop
+    onContentLoad?: () => void;
 }) {
-    // Create a mock attachment object for the image link
     const mockAttachment: Attachment = {
         id: 0,
         file_name: content || url.split("/").pop() || "image",
@@ -231,7 +229,7 @@ function ImageLinkAttachment({
             <AttachmentItem
                 attachment={mockAttachment}
                 onImageClick={onImageClick}
-                onContentLoad={onContentLoad} // Pass callback
+                onContentLoad={onContentLoad}
             />
         </div>
     );
@@ -244,7 +242,7 @@ function OpenGraphPreviewSpan({
     ogData,
     originalUrlText,
     onImageClick,
-    onContentLoad, // Add this prop
+    onContentLoad,
 }: {
     ogData: OGData;
     originalUrlText: string;
@@ -252,7 +250,7 @@ function OpenGraphPreviewSpan({
         attachment: Attachment,
         sourceElement?: HTMLElement,
     ) => void;
-    onContentLoad?: () => void; // Add this prop
+    onContentLoad?: () => void;
 }) {
     const { title, description, imageUrl, url: ogUrl, themeColor } = ogData;
     const [imgError, setImgError] = React.useState(false);
@@ -263,7 +261,6 @@ function OpenGraphPreviewSpan({
             e.preventDefault();
             e.stopPropagation();
 
-            // Create a mock attachment for the OG image
             const mockAttachment: Attachment = {
                 id: 0,
                 file_name: title || "image",
@@ -295,9 +292,9 @@ function OpenGraphPreviewSpan({
                         <img
                             src={imageUrl}
                             alt={title || "OpenGraph image"}
-                            className="h-auto max-h-[98px] w-full cursor-pointer rounded border object-contain transition-opacity hover:opacity-80"
+                            className="h-auto max-h-[98px] w-full cursor-pointer rounded object-contain transition-opacity hover:opacity-80"
                             onClick={handleImageClick}
-                            onLoad={() => onContentLoad?.()} // Trigger scroll when image loads
+                            onLoad={() => onContentLoad?.()}
                             onError={() => setImgError(true)}
                         />
                     </div>

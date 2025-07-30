@@ -47,7 +47,7 @@ export interface MessageChannelProps {
     currentUserId?: string;
     serverUrl: string;
     className?: string;
-    goToMessageId?: number; // Add this prop for external navigation
+    goToMessageId?: number; for external navigation
 }
 
 const isSameDay = (date1: Date, date2: Date): boolean => {
@@ -85,7 +85,7 @@ export default function MessageChannel({
     currentUserId,
     serverUrl,
     className,
-    goToMessageId, // Add this prop
+    goToMessageId,
 }: MessageChannelProps) {
     const [messageText, setMessageText] = React.useState("");
     const [messages, setMessages] = React.useState<Message[]>([]);
