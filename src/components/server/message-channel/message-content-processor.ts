@@ -29,8 +29,8 @@ export class MessageContentProcessor {
         let parts: MessageContentPart[] = [{ type: "text", content: text }];
 
         // Apply processors in order
-        parts = this.processMentions(parts);
         parts = this.processLinks(parts);
+        parts = this.processMentions(parts);
 
         return parts;
     }
