@@ -47,7 +47,7 @@ export interface MessageChannelProps {
     currentUserId?: string;
     serverUrl: string;
     className?: string;
-    goToMessageId?: number; for external navigation
+    goToMessageId?: number;
 }
 
 const isSameDay = (date1: Date, date2: Date): boolean => {
