@@ -160,6 +160,16 @@ export function MessageItem({
         return processor.processContent(message.content);
     }, [message.content, users]);
 
+    const isMentioningCurrentUser = React.useMemo(() => {
+        if (!currentUserId) return false;
+        return messageContentParts.some(
+            (part) =>
+                part.type === "mention" &&
+                part.data?.user &&
+                part.data.user.id === currentUserId,
+        );
+    }, [messageContentParts, currentUserId]);
+
     // Effect to fetch OpenGraph data for links
     React.useEffect(() => {
         let isActive = true;
@@ -322,6 +332,9 @@ export function MessageItem({
                 "hover:bg-accent/20 -mx-3 px-3 py-1",
                 showHeader ? "mt-1" : "mt-0",
                 isEditing && "bg-accent/10",
+                isMentioningCurrentUser &&
+                    !isEditing &&
+                    "bg-yellow-700/30 hover:bg-yellow-700/40",
             )}
         >
             {(showHeader && (
