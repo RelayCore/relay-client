@@ -36,7 +36,7 @@ export function ReplyPreview({
             className={cn(
                 "relative w-fit rounded-md",
                 isCompact &&
-                    "hover:bg-accent cursor-pointer p-1 pr-1.5 transition-colors",
+                    "hover:bg-accent cursor-pointer pr-1.5 pl-1 transition-colors",
                 !isCompact && "pb-3",
                 className,
             )}
@@ -44,7 +44,7 @@ export function ReplyPreview({
         >
             <div className="flex w-fit items-start gap-2">
                 {isCompact ? (
-                    <CornerLeftUp size={18} className="flex-shrink-0" />
+                    <CornerLeftUp size={18} className="mt-0.5 flex-shrink-0" />
                 ) : (
                     <Reply size={16} className="mt-0.5 mr-2.5 flex-shrink-0" />
                 )}
@@ -59,7 +59,7 @@ export function ReplyPreview({
                             className="h-4 w-4 flex-shrink-0"
                         />
                         <span
-                            className="truncate text-sm font-medium"
+                            className="text-medium truncate text-sm"
                             style={{ color: highestRole?.color || "inherit" }}
                         >
                             {displayName}
@@ -76,7 +76,7 @@ export function ReplyPreview({
                         ) : (
                             <div
                                 className={
-                                    "text-muted-foreground truncate text-xs leading-relaxed"
+                                    "text-muted-foreground truncate pt-1 text-xs leading-relaxed"
                                 }
                             >
                                 {truncatedContent}
