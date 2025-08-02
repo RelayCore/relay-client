@@ -2,7 +2,7 @@ import React from "react";
 import { cn } from "@/utils/tailwind";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Search, Users, Pin, Settings, ArrowLeft, Loader2 } from "lucide-react";
+import { Search, Users, Pin, Settings, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
     Popover,
@@ -41,6 +41,20 @@ export interface ServerHeaderProps {
     channelName?: string;
 }
 
+function ServerHeaderChannel({ channelName }: { channelName?: string }) {
+    return (
+        <>
+            {channelName && (
+                <>
+                    <span className="text-muted-foreground pointer-events-none">
+                        /
+                    </span>
+                    <span className="text-muted-foreground">{channelName}</span>
+                </>
+            )}
+        </>
+    );
+}
 export default function ServerHeader({
     userId,
     serverUrl,
@@ -117,37 +131,26 @@ export default function ServerHeader({
     return (
         <header
             className={cn(
-                `bg-background relative flex h-12 items-center justify-between border-b pr-3 ${isOnSettingsPage ? "pl-[0.3rem]" : "pl-3"}`,
+                `bg-background relative flex h-12 items-center justify-between border-b px-3`,
                 className,
             )}
         >
             <div className="flex items-center gap-3">
-                {showBackButton && (
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={onBackClick}
-                                className="text-muted-foreground hover:text-foreground"
-                            >
-                                <ArrowLeft size={20} />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Go back</p>
-                        </TooltipContent>
-                    </Tooltip>
-                )}
-                <h1 className="font-medium">{serverInfo.name}</h1>
-                {channelName && (
-                    <>
-                        <span className="text-muted-foreground">/</span>
-                        <span className="text-muted-foreground">
-                            {channelName}
-                        </span>
-                    </>
-                )}
+                <h1
+                    className={cn(
+                        "font-medium",
+                        showBackButton && "cursor-pointer hover:underline",
+                    )}
+                    onClick={() => {
+                        if (showBackButton && onBackClick) {
+                            onBackClick();
+                        }
+                    }}
+                >
+                    {serverInfo.name}
+                </h1>
+                <ServerHeaderChannel channelName={channelName} />
+                {showBackButton && <ServerHeaderChannel channelName={"edit"} />}
             </div>
 
             <div
@@ -255,9 +258,13 @@ export default function ServerHeader({
                                     isOnSettingsPage &&
                                         "bg-accent/50 text-accent-foreground",
                                 )}
-                                onClick={() =>
-                                    navigate({ to: `/servers/${userId}/edit` })
-                                }
+                                onClick={() => {
+                                    if (isOnSettingsPage) {
+                                        navigate({ to: `/servers/${userId}` });
+                                        return;
+                                    }
+                                    navigate({ to: `/servers/${userId}/edit` });
+                                }}
                             >
                                 <Settings size={20} />
                             </Button>
