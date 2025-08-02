@@ -56,6 +56,14 @@ export function formatMessageDate(timestamp: string): string {
     );
 }
 
+export function formatMessageTime(timestamp: string): string {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+}
+
 export function MessageItem({
     message,
     showHeader = true,
@@ -88,6 +96,7 @@ export function MessageItem({
 }) {
     const { users } = useMembers();
     const formattedDate = formatMessageDate(message.created_at);
+    const formattedTime = formatMessageTime(message.created_at);
     const hasAttachments =
         message.attachments &&
         Array.isArray(message.attachments) &&
@@ -329,7 +338,7 @@ export function MessageItem({
     return (
         <div
             className={cn(
-                "hover:bg-accent/20 -mx-3 px-3 py-1",
+                "hover:bg-accent/20 group -mx-3 px-3 py-1",
                 showHeader ? "mt-1" : "mt-0",
                 isEditing && "bg-accent/10",
                 isMentioningCurrentUser &&
@@ -374,7 +383,14 @@ export function MessageItem({
                         {MessageContent}
                     </div>
                 </div>
-            )) || <div className="ml-12">{MessageContent}</div>}
+            )) || (
+                <div className="flex items-start gap-2">
+                    <span className="text-muted-foreground flex w-10 items-center justify-center pt-0.5 text-xs opacity-0 transition-opacity duration-200 group-hover:opacity-100 ease-snappy">
+                        {formattedTime}
+                    </span>
+                    <div>{MessageContent}</div>
+                </div>
+            )}
 
             {hasAttachments && (
                 <div
