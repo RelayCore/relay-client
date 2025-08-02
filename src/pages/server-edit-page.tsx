@@ -401,7 +401,7 @@ export default function ServerEditPage() {
                 description: formData.description,
                 allow_invite: formData.allow_invite,
                 max_users: formData.max_users,
-                max_file_size: formData.max_file_size,
+                max_file_size: (formData.max_file_size ?? 50) * 1024 * 1024,
                 max_attachments: formData.max_attachments,
             };
 

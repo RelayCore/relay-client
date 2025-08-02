@@ -10,6 +10,7 @@ import {
     Channel,
     leaveServer as apiLeaveServer,
     Message,
+    getServerInfo,
 } from "@/api/server";
 import {
     getServerById,
@@ -106,11 +107,34 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         null,
     );
 
-    // Derive server info from server record and cached metadata
+    // Always refresh server info on launch and cache it
+    React.useEffect(() => {
+        const fetchAndCacheServerInfo = async () => {
+            if (!serverRecord || !userId) return;
+            try {
+                const freshInfo = await getServerInfo(serverRecord.server_url);
+                const cached = localStorage.getItem("server-status-cache");
+                const parsedCache = cached ? JSON.parse(cached) : {};
+                parsedCache[userId] = parsedCache[userId] || { metadata: {} };
+                parsedCache[userId].metadata = {
+                    ...parsedCache[userId].metadata,
+                    ...freshInfo,
+                };
+                localStorage.setItem(
+                    "server-status-cache",
+                    JSON.stringify(parsedCache),
+                );
+            } catch {
+                // Ignore errors, fallback to cache or serverRecord
+            }
+        };
+        fetchAndCacheServerInfo();
+    }, [serverRecord, userId]);
+
+    // Derive server info from cached metadata (after initial fetch)
     const serverInfo = React.useMemo((): ServerInfo | null => {
         if (!serverRecord || !userId) return null;
 
-        // Try to get cached metadata first
         try {
             const cached = localStorage.getItem("server-status-cache");
             if (cached) {
