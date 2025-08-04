@@ -382,12 +382,26 @@ function BaseLayoutContent({
         const loadServerData = async () => {
             try {
                 const serverData = await loadServers();
+
+                for (const server of serverData) {
+                    if (server.server_url && server.public_key) {
+                        await window.cookieAPI.set({
+                            url: server.server_url,
+                            name: "auth_token",
+                            value: server.public_key,
+                            path: "/",
+                            sameSite: "lax",
+                        });
+                        const cookies = await window.cookieAPI.get({
+                            url: server.server_url,
+                            name: "auth_token",
+                        });
+                        console.log("Cookies after set:", cookies);
+                    }
+                }
+
                 setServers(serverData);
-
-                // Verify servers and connect to WebSockets
                 verifyServers(serverData);
-
-                // Initialize connection states
                 const initialConnectionStates = new Map<string, boolean>();
                 serverData.forEach((server) => {
                     initialConnectionStates.set(

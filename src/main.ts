@@ -102,6 +102,7 @@ function createMainWindow() {
             nodeIntegration: true,
             nodeIntegrationInSubFrames: false,
             preload: preload,
+            session: session.defaultSession,
         },
         titleBarStyle: "hidden",
     });
@@ -176,6 +177,8 @@ async function installExtensions() {
     }
 }
 
+const LOCAL_URLS = ["localhost", "devtools", "chrome-extension"];
+
 app.commandLine.appendSwitch("enable-experimental-web-platform-features");
 app.whenReady().then(async () => {
     // Register IPC handler for loading completion
@@ -185,9 +188,19 @@ app.whenReady().then(async () => {
     });
 
     session.defaultSession.webRequest.onBeforeSendHeaders(
-        (details, callback) => {
+        async (details, callback) => {
             details.requestHeaders["Origin"] = "https://relay-client/";
             details.requestHeaders["Referer"] = "https://relay-client/";
+            if (!LOCAL_URLS.some((url) => details.url.includes(url))) {
+                const cookies = await session.defaultSession.cookies.get({
+                    url: details.url,
+                    name: "auth_token",
+                });
+                if (cookies.length > 0) {
+                    details.requestHeaders["Cookies"] =
+                        `auth_token=${cookies[0].value}`;
+                }
+            }
             callback({ requestHeaders: details.requestHeaders });
         },
     );

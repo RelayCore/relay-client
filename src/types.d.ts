@@ -200,12 +200,21 @@ interface ogAPI {
     fetchMeta: (url: string) => Promise<OGData>;
 }
 
+interface CookieAPI {
+    set: (cookie: Electron.CookiesSetDetails) => Promise<void>;
+    get: (
+        details: Electron.CookiesGetFilter,
+    ) => Promise<Electron.Cookie | null>;
+    delete: (url: string, name: string) => Promise<void>;
+}
+
 declare interface Window {
     themeMode: ThemeModeContext;
     electronWindow: ElectronWindow;
     loadingManager: LoadingManagerAPI;
     fileSystem: FileSystemContext;
     ogAPI: ogAPI;
+    cookieAPI: CookieAPI;
     appConfig: {
         name: string;
         protocolName: string;
