@@ -184,6 +184,14 @@ app.whenReady().then(async () => {
         tryShowMainWindow();
     });
 
+    session.defaultSession.webRequest.onBeforeSendHeaders(
+        (details, callback) => {
+            details.requestHeaders["Origin"] = "https://relay-client/";
+            details.requestHeaders["Referer"] = "https://relay-client/";
+            callback({ requestHeaders: details.requestHeaders });
+        },
+    );
+
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
         const responseHeaders = details.responseHeaders || {};
 
