@@ -23,6 +23,7 @@ export function formatMessageDate(timestamp: string): string {
         return `Today at ${date.toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
+            hour12: false,
         })}`;
     }
 
@@ -52,6 +53,7 @@ export function formatMessageDate(timestamp: string): string {
         ` at ${date.toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
+            hour12: false,
         })}`
     );
 }
@@ -61,6 +63,7 @@ export function formatMessageTime(timestamp: string): string {
     return date.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
+        hour12: false,
     });
 }
 
@@ -385,7 +388,7 @@ export function MessageItem({
                 </div>
             )) || (
                 <div className="flex items-start gap-2">
-                    <span className="text-muted-foreground flex w-10 items-center justify-center pt-0.5 text-xs opacity-0 transition-opacity duration-200 group-hover:opacity-100 ease-snappy">
+                    <span className="text-muted-foreground ease-snappy flex w-10 items-center justify-center pt-0.5 text-xs opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                         {formattedTime}
                     </span>
                     <div>{MessageContent}</div>
