@@ -34,6 +34,7 @@ export function ImageModal({
     const [targetZoom, setTargetZoom] = React.useState(1);
     const [targetPan, setTargetPan] = React.useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = React.useState(false);
+    const [justDragged, setJustDragged] = React.useState(false);
     const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });
     const imageRef = React.useRef<HTMLImageElement>(null);
 
@@ -132,8 +133,24 @@ export function ImageModal({
     );
 
     const handleMouseUp = React.useCallback(() => {
-        setIsDragging(false);
-    }, []);
+        if (isDragging) {
+            setIsDragging(false);
+            setJustDragged(true);
+            setTimeout(() => setJustDragged(false), 10);
+        }
+    }, [isDragging]);
+
+    const handleModalClick = React.useCallback(
+        (e: React.MouseEvent) => {
+            if (justDragged) {
+                setJustDragged(false);
+                e.stopPropagation();
+                return;
+            }
+            if (!animatingClose) handleRequestClose();
+        },
+        [justDragged, animatingClose, handleRequestClose],
+    );
 
     if (!openedImage && !prevImage.current) return null;
     const image = openedImage || prevImage.current;
@@ -147,14 +164,14 @@ export function ImageModal({
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.2 }}
                     className="fixed inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-sm"
-                    onClick={!animatingClose ? handleRequestClose : undefined}
+                    onClick={handleModalClick}
                 >
                     {/* Controls at the top */}
                     <motion.div
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.2, delay: 0.1 }}
+                        transition={{ duration: 0.2 }}
                         className="flex items-center justify-between p-4 text-white"
                     >
                         <div className="max-w-md truncate text-sm">
@@ -232,11 +249,10 @@ export function ImageModal({
                         onMouseMove={handleMouseMove}
                         onMouseUp={handleMouseUp}
                         onDoubleClick={handleDoubleClick}
-                        onMouseLeave={handleMouseUp}
                         animate={{
                             scale: targetZoom,
-                            x: targetPan.x / targetZoom,
-                            y: targetPan.y / targetZoom,
+                            x: targetPan.x,
+                            y: targetPan.y,
                         }}
                         transition={{
                             duration: animatingClose ? 0.3 : 0,
