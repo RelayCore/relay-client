@@ -109,6 +109,7 @@ export function JoinServerDialog({
                     server_allow_invite: result.serverInfo.allow_invite,
                     server_max_users: result.serverInfo.max_users,
                     server_icon: result.serverInfo.icon,
+                    identity_id: result.userId!,
                 };
 
                 // Add server to storage
