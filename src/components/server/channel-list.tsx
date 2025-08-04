@@ -83,7 +83,6 @@ export default function ChannelList({
         selectedChannelId,
         selectedVoiceChannelId,
         setSelectedVoiceChannelId,
-        refreshServerData,
         isChannelUnread,
     } = useServer();
     const serverRecord = useServerRecord();
@@ -282,7 +281,7 @@ export default function ChannelList({
     };
 
     const handleChannelCreated = () => {
-        refreshServerData();
+        logInfo("Channel created", "api");
     };
 
     const handleChannelClick = async (channel: Channel) => {
@@ -432,9 +431,6 @@ export default function ChannelList({
                                                     currentUser={
                                                         currentUser ?? null
                                                     }
-                                                    onChannelDeleted={
-                                                        refreshServerData
-                                                    }
                                                     onMoveChannel={moveChannel}
                                                 />
                                             ))}
@@ -464,7 +460,9 @@ export default function ChannelList({
                     open={editChannelOpen}
                     onOpenChange={setEditChannelOpen}
                     channel={editChannel}
-                    onChannelUpdated={refreshServerData}
+                    onChannelUpdated={() => {
+                        logInfo("Channel updated", "api");
+                    }}
                 />
             </div>
         </DndProvider>
@@ -597,7 +595,6 @@ interface DraggableChannelProps {
     onEditChannel: (channel: Channel) => void;
     serverUrl: string;
     currentUser: User | null;
-    onChannelDeleted: () => void;
     onMoveChannel: (
         channel: Channel,
         groupId: number,
@@ -614,7 +611,6 @@ function DraggableChannel({
     onEditChannel,
     serverUrl,
     currentUser,
-    onChannelDeleted,
     onMoveChannel,
 }: DraggableChannelProps) {
     const [{ isDragging }, drag, preview] = useDrag(
@@ -688,7 +684,9 @@ function DraggableChannel({
                 channel={channel}
                 serverUrl={serverUrl}
                 currentUser={currentUser ?? undefined}
-                onChannelDeleted={onChannelDeleted}
+                onChannelDeleted={() => {
+                    logInfo("Channel deleted", "api");
+                }}
                 onChannelEdit={onEditChannel}
             >
                 <button
