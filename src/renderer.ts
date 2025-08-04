@@ -1,4 +1,4 @@
-import "@/app";
+import "@/App";
 
 const savedTheme = localStorage.getItem("theme");
 if (
