@@ -226,18 +226,19 @@ export function MessageInput({
                     />
                 </div>
 
-                {serverInfo?.tenor_enabled && (
-                    <GifPopup onGifSelect={onGifSelect}>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-muted-foreground hover:text-foreground"
-                            disabled={sending || !canWrite}
-                        >
-                            <ImagePlay size={20} />
-                        </Button>
-                    </GifPopup>
-                )}
+                <GifPopup
+                    onGifSelect={onGifSelect}
+                    tenorEnabled={!!serverInfo?.tenor_enabled}
+                >
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-foreground"
+                        disabled={sending || !canWrite}
+                    >
+                        <ImagePlay size={20} />
+                    </Button>
+                </GifPopup>
 
                 <EmojiPopup onEmojiSelect={onEmojiSelect}>
                     <Button

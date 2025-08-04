@@ -22,6 +22,7 @@ import { logError } from "@/utils/logger";
 
 interface GifPopupProps {
     onGifSelect: (gifUrl: string) => void;
+    tenorEnabled?: boolean;
     children: React.ReactNode;
 }
 
@@ -29,12 +30,15 @@ type ViewMode = "trending" | "search" | "attachments" | "starred";
 
 export const GifPopup = React.memo(function GifPopup({
     onGifSelect,
+    tenorEnabled,
     children,
 }: GifPopupProps) {
     const { serverRecord } = useServer();
     const { userId } = useCurrentUser();
     const [searchQuery, setSearchQuery] = React.useState("");
-    const [viewMode, setViewMode] = React.useState<ViewMode>("trending");
+    const [viewMode, setViewMode] = React.useState<ViewMode>(
+        tenorEnabled ? "trending" : "attachments",
+    );
     const [open, setOpen] = React.useState(false);
     const [gifs, setGifs] = React.useState<TenorGifResult[]>([]);
     const [attachments, setAttachments] = React.useState<
@@ -54,6 +58,7 @@ export const GifPopup = React.memo(function GifPopup({
 
     // Load trending GIFs when component opens or viewMode changes to trending
     React.useEffect(() => {
+        if (!tenorEnabled) return;
         const loadTrendingGifs = async () => {
             if (!serverRecord?.server_url || !userId) return;
 
@@ -131,6 +136,7 @@ export const GifPopup = React.memo(function GifPopup({
 
     // Handle search
     React.useEffect(() => {
+        if (!tenorEnabled) return;
         const performSearch = async () => {
             if (!serverRecord?.server_url || !userId || !searchQuery.trim()) {
                 if (viewMode === "search" && !searchQuery.trim()) {
@@ -211,42 +217,48 @@ export const GifPopup = React.memo(function GifPopup({
             >
                 <div className="flex h-full flex-col">
                     {/* Search */}
-                    <div className="flex-shrink-0 border-b p-3">
-                        <div className="relative">
-                            <Search
-                                size={20}
-                                className="text-muted-foreground absolute top-1/2 left-3 -translate-y-1/2 transform"
-                            />
-                            <Input
-                                placeholder="Search GIFs..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="h-10 pl-10 text-base"
-                                disabled={viewMode === "starred"}
-                            />
+                    {tenorEnabled && (
+                        <div className="flex-shrink-0 border-b p-3">
+                            <div className="relative">
+                                <Search
+                                    size={20}
+                                    className="text-muted-foreground absolute top-1/2 left-3 -translate-y-1/2 transform"
+                                />
+                                <Input
+                                    placeholder="Search GIFs..."
+                                    value={searchQuery}
+                                    onChange={(e) =>
+                                        setSearchQuery(e.target.value)
+                                    }
+                                    className="h-10 pl-10 text-base"
+                                    disabled={viewMode === "starred"}
+                                />
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Tab Navigation */}
                     <div className="flex-shrink-0 border-b p-2">
                         <div className="flex space-x-2">
-                            <Button
-                                variant={
-                                    viewMode === "trending"
-                                        ? "secondary"
-                                        : "outline"
-                                }
-                                size="sm"
-                                className="h-8"
-                                onClick={() => {
-                                    setViewMode("trending");
-                                    setSearchQuery("");
-                                }}
-                                title="Trending"
-                            >
-                                <TrendingUp size={16} className="mr-1.5" />
-                                Trending
-                            </Button>
+                            {tenorEnabled && (
+                                <Button
+                                    variant={
+                                        viewMode === "trending"
+                                            ? "secondary"
+                                            : "outline"
+                                    }
+                                    size="sm"
+                                    className="h-8"
+                                    onClick={() => {
+                                        setViewMode("trending");
+                                        setSearchQuery("");
+                                    }}
+                                    title="Trending"
+                                >
+                                    <TrendingUp size={16} className="mr-1.5" />
+                                    Trending
+                                </Button>
+                            )}
                             <Button
                                 variant={
                                     viewMode === "attachments"
