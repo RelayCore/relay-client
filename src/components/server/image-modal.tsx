@@ -27,9 +27,12 @@ export function ImageModal({
     onStar,
 }: ImageModalProps) {
     const [visible, setVisible] = React.useState(false);
+    const [animatingClose, setAnimatingClose] = React.useState(false);
     const prevImage = React.useRef<typeof openedImage>(null);
     const [zoom, setZoom] = React.useState(1);
     const [pan, setPan] = React.useState({ x: 0, y: 0 });
+    const [targetZoom, setTargetZoom] = React.useState(1);
+    const [targetPan, setTargetPan] = React.useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = React.useState(false);
     const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });
     const imageRef = React.useRef<HTMLImageElement>(null);
@@ -44,18 +47,19 @@ export function ImageModal({
     }, [openedImage]);
 
     React.useEffect(() => {
+        if (!animatingClose && targetZoom !== zoom) setTargetZoom(zoom);
+        if (!animatingClose && (targetPan.x !== pan.x || targetPan.y !== pan.y))
+            setTargetPan(pan);
+    }, [zoom, pan, animatingClose, targetZoom, targetPan]);
+
+    React.useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (!visible) return;
 
             if (e.key === "Escape") {
-                setZoom(1);
-                setPan({ x: 0, y: 0 });
-                requestAnimationFrame(() => {
-                    handleRequestClose();
-                });
+                handleRequestClose();
             } else if (e.key === "0" || e.key === "r") {
-                setZoom(1);
-                setPan({ x: 0, y: 0 });
+                handleReset();
             }
         };
 
@@ -63,8 +67,30 @@ export function ImageModal({
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [visible]);
 
+    function animateToDefaultAnd(after: () => void) {
+        setAnimatingClose(true);
+        setTargetZoom(1);
+        setTargetPan({ x: 0, y: 0 });
+        setTimeout(() => {
+            setAnimatingClose(false);
+            setZoom(1);
+            setPan({ x: 0, y: 0 });
+            setTargetZoom(1);
+            setTargetPan({ x: 0, y: 0 });
+            after();
+        }, 0);
+    }
+
     const handleRequestClose = React.useCallback(() => {
-        setVisible(false);
+        animateToDefaultAnd(() => {
+            setVisible(false);
+        });
+    }, []);
+
+    const handleReset = React.useCallback(() => {
+        animateToDefaultAnd(() => {
+            // No further action needed for reset
+        });
     }, []);
 
     const handleExited = React.useCallback(() => {
@@ -121,7 +147,7 @@ export function ImageModal({
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.2 }}
                     className="fixed inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-sm"
-                    onClick={handleRequestClose}
+                    onClick={!animatingClose ? handleRequestClose : undefined}
                 >
                     {/* Controls at the top */}
                     <motion.div
@@ -200,20 +226,29 @@ export function ImageModal({
                     </motion.div>
 
                     {/* Image container with animation from source */}
-                    <div
+                    <motion.div
                         className="flex flex-1 items-center justify-center overflow-hidden p-4"
                         onWheel={handleWheel}
                         onMouseMove={handleMouseMove}
                         onMouseUp={handleMouseUp}
                         onDoubleClick={handleDoubleClick}
                         onMouseLeave={handleMouseUp}
+                        animate={{
+                            scale: targetZoom,
+                            x: targetPan.x / targetZoom,
+                            y: targetPan.y / targetZoom,
+                        }}
+                        transition={{
+                            duration: animatingClose ? 0.3 : 0,
+                            ease: [0.4, 0, 0.2, 1],
+                        }}
                         style={{
-                            transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
                             cursor: isDragging
                                 ? "grabbing"
-                                : zoom > 1
+                                : targetZoom > 1
                                   ? "grab"
                                   : "default",
+                            pointerEvents: animatingClose ? "none" : undefined,
                         }}
                     >
                         <motion.img
@@ -268,7 +303,7 @@ export function ImageModal({
                                 ease: [0.4, 0, 0.2, 1],
                             }}
                         />
-                    </div>
+                    </motion.div>
                 </motion.div>
             )}
         </AnimatePresence>
