@@ -1,8 +1,7 @@
 import React from "react";
 import { cn } from "@/utils/tailwind";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { Paperclip, Download, ExternalLink, X, Star } from "lucide-react";
+import { Paperclip } from "lucide-react";
 import {
     Message,
     Attachment,
@@ -30,16 +29,15 @@ import { useServer } from "@/contexts/server-context";
 import { MentionsPopup } from "./mention-popup";
 import { toast } from "sonner";
 import { cacheManager } from "@/utils/cache-manager";
-import { downloadFile } from "@/utils/assets";
 import {
     getLocalStorageItem,
     updateLocalStorageItem,
 } from "@/utils/localstorage";
 import { MessageItem } from "./message-channel/message-item";
 import { MessageContentProcessor } from "./message-channel/message-content-processor";
-import { motion, AnimatePresence } from "framer-motion";
 import { MessageInput } from "./message-channel/message-input";
 import { logError, logWarning } from "@/utils/logger";
+import { ImageModal } from "./image-modal";
 
 export interface MessageChannelProps {
     channelId: number;
@@ -1159,157 +1157,13 @@ export default function MessageChannel({
             )}
 
             {/* Image Modal with Framer Motion */}
-            <AnimatePresence>
-                {openedImage && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="fixed inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-sm"
-                        onClick={handleCloseImageModal}
-                    >
-                        {/* Controls at the top */}
-                        <motion.div
-                            initial={{ opacity: 0, y: -20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            transition={{ duration: 0.2, delay: 0.1 }}
-                            className="flex items-center justify-between p-4 text-white"
-                        >
-                            <div className="max-w-md truncate text-sm">
-                                {openedImage.file_name} (
-                                {formatFileSize(openedImage.file_size)})
-                            </div>
-                            <div className="flex flex-shrink-0 gap-2">
-                                <Button
-                                    size="icon"
-                                    variant="secondary"
-                                    className={cn(
-                                        "h-8 w-8",
-                                        starredImages.includes(
-                                            openedImage.file_path,
-                                        ) &&
-                                            "bg-yellow-500 text-yellow-50 hover:bg-yellow-600",
-                                    )}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleStarImage(openedImage.file_path);
-                                    }}
-                                    title={
-                                        starredImages.includes(
-                                            openedImage.file_path,
-                                        )
-                                            ? "Remove from starred"
-                                            : "Add to starred"
-                                    }
-                                >
-                                    <Star
-                                        size={16}
-                                        className={
-                                            starredImages.includes(
-                                                openedImage.file_path,
-                                            )
-                                                ? "fill-current"
-                                                : ""
-                                        }
-                                    />
-                                </Button>
-                                <Button
-                                    size="icon"
-                                    variant="secondary"
-                                    className="h-8 w-8"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        downloadFile(
-                                            openedImage.file_path,
-                                            openedImage.file_name,
-                                        );
-                                    }}
-                                >
-                                    <Download size={16} />
-                                </Button>
-                                <Button
-                                    size="icon"
-                                    variant="secondary"
-                                    className="h-8 w-8"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        window.open(
-                                            openedImage.file_path,
-                                            "_blank",
-                                        );
-                                    }}
-                                >
-                                    <ExternalLink size={16} />
-                                </Button>
-                                <Button
-                                    size="icon"
-                                    variant="secondary"
-                                    className="h-8 w-8"
-                                    onClick={handleCloseImageModal}
-                                >
-                                    <X size={16} />
-                                </Button>
-                            </div>
-                        </motion.div>
-
-                        {/* Image container with animation from source */}
-                        <div className="flex flex-1 items-center justify-center p-4">
-                            <motion.img
-                                key={openedImage.id}
-                                src={openedImage.file_path}
-                                alt={openedImage.file_name}
-                                className="max-h-full max-w-full object-contain"
-                                onClick={(e) => e.stopPropagation()}
-                                initial={
-                                    sourceImageRect
-                                        ? {
-                                              x:
-                                                  sourceImageRect.left +
-                                                  sourceImageRect.width / 2 -
-                                                  window.innerWidth / 2,
-                                              y:
-                                                  sourceImageRect.top +
-                                                  sourceImageRect.height / 2 -
-                                                  window.innerHeight / 2,
-                                              scale: Math.min(
-                                                  sourceImageRect.width / 400,
-                                                  sourceImageRect.height / 400,
-                                              ),
-                                              opacity: 1,
-                                          }
-                                        : { scale: 0.8, opacity: 0 } // Fallback initial
-                                }
-                                animate={{ x: 0, y: 0, scale: 1, opacity: 1 }}
-                                exit={
-                                    sourceImageRect
-                                        ? {
-                                              x:
-                                                  sourceImageRect.left +
-                                                  sourceImageRect.width / 2 -
-                                                  window.innerWidth / 2,
-                                              y:
-                                                  sourceImageRect.top +
-                                                  sourceImageRect.height / 2 -
-                                                  window.innerHeight / 2,
-                                              scale: Math.min(
-                                                  sourceImageRect.width / 400,
-                                                  sourceImageRect.height / 400,
-                                              ),
-                                              opacity: 1,
-                                          }
-                                        : { scale: 0.8, opacity: 0 } // Fallback exit
-                                }
-                                transition={{
-                                    duration: 0.3,
-                                    ease: [0.4, 0, 0.2, 1],
-                                }}
-                            />
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <ImageModal
+                openedImage={openedImage}
+                sourceImageRect={sourceImageRect}
+                starredImages={starredImages}
+                onClose={handleCloseImageModal}
+                onStar={handleStarImage}
+            />
 
             {/* Loading overlay for go-to-message */}
             {loadingMessageAround && (
