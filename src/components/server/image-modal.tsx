@@ -88,6 +88,11 @@ export function ImageModal({
         [pan],
     );
 
+    const handleDoubleClick = React.useCallback(() => {
+        setZoom((prev) => (prev === 1 ? 2 : 1));
+        setPan({ x: 0, y: 0 });
+    }, []);
+
     const handleMouseMove = React.useCallback(
         (e: React.MouseEvent) => {
             if (isDragging) {
@@ -200,6 +205,7 @@ export function ImageModal({
                         onWheel={handleWheel}
                         onMouseMove={handleMouseMove}
                         onMouseUp={handleMouseUp}
+                        onDoubleClick={handleDoubleClick}
                         onMouseLeave={handleMouseUp}
                         style={{
                             transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
