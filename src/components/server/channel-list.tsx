@@ -836,6 +836,7 @@ function UserPanel({
     const { userId } = useParams({ strict: false });
     const [isMuted, setIsMuted] = React.useState(false);
     const [isDeafened, setIsDeafened] = React.useState(false);
+    console.log(currentUser);
 
     const handleMuteToggle = async () => {
         if (userId && !isDeafened) {
@@ -914,7 +915,7 @@ function UserPanel({
                 <div className="flex min-w-0 flex-1 items-center gap-2">
                     <UserAvatar
                         displayName={
-                            currentUser.nickname ?? currentUser.username
+                            currentUser.nickname || currentUser.username
                         }
                         profilePictureUrl={currentUser.profile_picture_url}
                         className="h-8 w-8"
@@ -922,9 +923,9 @@ function UserPanel({
                     <div className="min-w-0 flex-1">
                         <span
                             className="block truncate text-sm font-medium"
-                            title={currentUser.nickname ?? currentUser.username}
+                            title={currentUser.nickname || currentUser.username}
                         >
-                            {currentUser.nickname ?? currentUser.username}
+                            {currentUser.nickname || currentUser.username}
                         </span>
                         <span className="text-muted-foreground text-xs">
                             {connectedVoiceChannel ? "In voice" : "Online"}
