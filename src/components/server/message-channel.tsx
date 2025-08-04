@@ -29,15 +29,12 @@ import { useServer } from "@/contexts/server-context";
 import { MentionsPopup } from "./mention-popup";
 import { toast } from "sonner";
 import { cacheManager } from "@/utils/cache-manager";
-import {
-    getLocalStorageItem,
-    updateLocalStorageItem,
-} from "@/utils/localstorage";
 import { MessageItem } from "./message-channel/message-item";
 import { MessageContentProcessor } from "./message-channel/message-content-processor";
 import { MessageInput } from "./message-channel/message-input";
 import { logError, logWarning } from "@/utils/logger";
 import { ImageModal } from "./image-modal";
+import { getStarredImages, starImage } from "@/utils/messages/favorite-images";
 
 export interface MessageChannelProps {
     channelId: number;
@@ -85,6 +82,7 @@ export default function MessageChannel({
     className,
     goToMessageId,
 }: MessageChannelProps) {
+    const { serverRecord } = useServer();
     const [messageText, setMessageText] = React.useState("");
     const [messages, setMessages] = React.useState<Message[]>([]);
     const [loading, setLoading] = React.useState(false);
@@ -927,40 +925,23 @@ export default function MessageChannel({
         return parseMessageForDisplay(messageText);
     }, [messageText, parseMessageForDisplay]);
 
-    // Load starred images from localStorage on mount
     React.useEffect(() => {
-        const stored = getLocalStorageItem("starred-images") || [];
-        setStarredImages(stored);
-    }, []);
+        if (!serverRecord) return;
+        setStarredImages(getStarredImages(serverRecord));
+    }, [serverRecord]);
 
     const handleStarImage = React.useCallback(
         (imageUrl: string) => {
-            const isCurrentlyStarred = starredImages.includes(imageUrl);
-
-            updateLocalStorageItem("starred-images", (current) => {
-                const currentArray = current || [];
-                if (isCurrentlyStarred) {
-                    return currentArray.filter((url) => url !== imageUrl);
-                } else {
-                    return [...currentArray, imageUrl];
-                }
-            });
-
-            setStarredImages((prev) => {
-                if (isCurrentlyStarred) {
-                    return prev.filter((url) => url !== imageUrl);
-                } else {
-                    return [...prev, imageUrl];
-                }
-            });
-
+            if (!serverRecord) return;
+            const added = starImage(imageUrl, starredImages, serverRecord);
+            setStarredImages(getStarredImages(serverRecord));
             toast.success(
-                isCurrentlyStarred
-                    ? "Removed from starred images"
-                    : "Added to starred images",
+                added
+                    ? "Added to starred images"
+                    : "Removed from starred images",
             );
         },
-        [starredImages],
+        [starredImages, serverRecord],
     );
 
     // Go to message function

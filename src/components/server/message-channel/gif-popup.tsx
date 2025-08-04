@@ -119,7 +119,7 @@ export const GifPopup = React.memo(function GifPopup({
         const loadStarredImages = () => {
             setLoading(true);
             try {
-                const stored = getLocalStorageItem("starred-images") || [];
+                const stored = getLocalStorageItem(`starred-images-${serverRecord?.server_url}`) || [];
                 setStarredImages(stored);
             } catch (error) {
                 logError("Failed to load starred images", "api", String(error));
@@ -132,7 +132,7 @@ export const GifPopup = React.memo(function GifPopup({
         if (open && viewMode === "starred") {
             loadStarredImages();
         }
-    }, [open, viewMode]);
+    }, [open, viewMode, serverRecord?.server_url]);
 
     // Handle search
     React.useEffect(() => {

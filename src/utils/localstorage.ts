@@ -10,7 +10,8 @@ export interface LocalStorageItems {
         members: number;
     };
     "server-status-cache": ServerInfo;
-    "starred-images": string[];
+    "starred-images-global": string[];
+    [key: `starred-images-${string}`]: string[];
 }
 
 export type LocalStorageKey = keyof LocalStorageItems;

@@ -1,15 +1,13 @@
 import React from "react";
+import { useServer } from "@/contexts/server-context";
 import { Button } from "@/components/ui/button";
 import { Download, ExternalLink, FileText, Star } from "lucide-react";
 import { Attachment, formatFileSize } from "@/api/server";
 import { CustomVideoPlayer } from "../video-player";
 import { downloadFile } from "@/utils/assets";
-import {
-    getLocalStorageItem,
-    updateLocalStorageItem,
-} from "@/utils/localstorage";
 import { toast } from "sonner";
 import { cn } from "@/utils/tailwind";
+import { getStarredImages, starImage } from "@/utils/messages/favorite-images";
 
 export function AttachmentItem({
     attachment,
@@ -23,45 +21,29 @@ export function AttachmentItem({
     ) => void;
     onContentLoad?: () => void;
 }) {
+    const { serverRecord } = useServer();
     const isImage = attachment.type === "image";
     const isVideo = attachment.type === "video";
     const fileSize = formatFileSize(attachment.file_size);
 
     const [starredImages, setStarredImages] = React.useState<string[]>([]);
     React.useEffect(() => {
-        const stored = getLocalStorageItem("starred-images") || [];
-        setStarredImages(stored);
-    }, []);
+        if (!serverRecord) return;
+        setStarredImages(getStarredImages(serverRecord));
+    }, [serverRecord]);
 
     const handleStarImage = React.useCallback(
-        (e: React.MouseEvent, imageUrl: string) => {
-            e.stopPropagation();
-            const isCurrentlyStarred = starredImages.includes(imageUrl);
-
-            updateLocalStorageItem("starred-images", (current) => {
-                const currentArray = current || [];
-                if (isCurrentlyStarred) {
-                    return currentArray.filter((url) => url !== imageUrl);
-                } else {
-                    return [...currentArray, imageUrl];
-                }
-            });
-
-            setStarredImages((prev) => {
-                if (isCurrentlyStarred) {
-                    return prev.filter((url) => url !== imageUrl);
-                } else {
-                    return [...prev, imageUrl];
-                }
-            });
-
+        (imageUrl: string) => {
+            if (!serverRecord) return;
+            const added = starImage(imageUrl, starredImages, serverRecord);
+            setStarredImages(getStarredImages(serverRecord));
             toast.success(
-                isCurrentlyStarred
-                    ? "Removed from starred images"
-                    : "Added to starred images",
+                added
+                    ? "Added to starred images"
+                    : "Removed from starred images",
             );
         },
-        [starredImages],
+        [starredImages, serverRecord],
     );
 
     // Open attachment in a new tab
@@ -104,8 +86,8 @@ export function AttachmentItem({
                                 starredImages.includes(attachment.file_path) &&
                                     "bg-yellow-500/80 hover:bg-yellow-600/80",
                             )}
-                            onClick={(e) =>
-                                handleStarImage(e, attachment.file_path)
+                            onClick={() =>
+                                handleStarImage(attachment.file_path)
                             }
                             title={
                                 starredImages.includes(attachment.file_path)
