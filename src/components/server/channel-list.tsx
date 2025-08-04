@@ -836,7 +836,6 @@ function UserPanel({
     const { userId } = useParams({ strict: false });
     const [isMuted, setIsMuted] = React.useState(false);
     const [isDeafened, setIsDeafened] = React.useState(false);
-    console.log(currentUser);
 
     const handleMuteToggle = async () => {
         if (userId && !isDeafened) {
