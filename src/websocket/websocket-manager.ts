@@ -641,6 +641,26 @@ export class WebSocketManager {
                 "websocket",
                 `User ID: ${server.user_id}`,
             );
+
+            try {
+                const cached = localStorage.getItem("server-status-cache");
+                const parsedCache = cached ? JSON.parse(cached) : {};
+                if (!parsedCache[server.user_id]) {
+                    parsedCache[server.user_id] = {};
+                }
+                parsedCache[server.user_id].online = true;
+                parsedCache[server.user_id].lastChecked = Date.now();
+                localStorage.setItem(
+                    "server-status-cache",
+                    JSON.stringify(parsedCache),
+                );
+            } catch (e) {
+                logWarning(
+                    "Failed to update server-status-cache after websocket connect",
+                    "websocket",
+                    String(e),
+                );
+            }
         } catch (error) {
             logError(
                 `Failed to connect server`,
