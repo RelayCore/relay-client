@@ -32,6 +32,8 @@ export function CustomVideoPlayer({
     const [showControls, setShowControls] = React.useState(false);
     const [isLoading, setIsLoading] = React.useState(true);
     const [isFullscreen, setIsFullscreen] = React.useState(false);
+    const [isScrubbing, setIsScrubbing] = React.useState(false);
+    const [scrubTime, setScrubTime] = React.useState<number | null>(null);
     const hideControlsTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
     const fileSize = formatFileSize(attachment.file_size);
 
@@ -253,6 +255,66 @@ export function CustomVideoPlayer({
         };
     }, []);
 
+    // Scrubbing handlers
+    const handleScrubStart = React.useCallback(
+        (e: React.MouseEvent<HTMLDivElement>) => {
+            if (!containerRef.current) return;
+            setIsScrubbing(true);
+            const rect = e.currentTarget.getBoundingClientRect();
+            const progress = (e.clientX - rect.left) / rect.width;
+            const newTime = Math.max(
+                0,
+                Math.min(duration, progress * duration),
+            );
+            setScrubTime(newTime);
+            // Prevent text selection
+            document.body.style.userSelect = "none";
+        },
+        [duration],
+    );
+
+    const handleScrubMove = React.useCallback(
+        (e: MouseEvent) => {
+            if (!isScrubbing || !containerRef.current) return;
+            const progressBar = containerRef.current.querySelector(
+                ".custom-progress-bar",
+            ) as HTMLDivElement | null;
+            if (!progressBar) return;
+            const rect = progressBar.getBoundingClientRect();
+            const progress = (e.clientX - rect.left) / rect.width;
+            const newTime = Math.max(
+                0,
+                Math.min(duration, progress * duration),
+            );
+            setScrubTime(newTime);
+        },
+        [isScrubbing, duration],
+    );
+
+    const handleScrubEnd = React.useCallback(() => {
+        if (!isScrubbing) return;
+        setIsScrubbing(false);
+        if (scrubTime !== null) {
+            handleSeek(scrubTime);
+        }
+        setScrubTime(null);
+    }, [isScrubbing, scrubTime, handleSeek]);
+
+    // Attach/detach mousemove/mouseup listeners for scrubbing
+    React.useEffect(() => {
+        if (isScrubbing) {
+            window.addEventListener("mousemove", handleScrubMove);
+            window.addEventListener("mouseup", handleScrubEnd);
+        } else {
+            window.removeEventListener("mousemove", handleScrubMove);
+            window.removeEventListener("mouseup", handleScrubEnd);
+        }
+        return () => {
+            window.removeEventListener("mousemove", handleScrubMove);
+            window.removeEventListener("mouseup", handleScrubEnd);
+        };
+    }, [isScrubbing, handleScrubMove, handleScrubEnd]);
+
     return (
         <div
             ref={containerRef}
@@ -321,23 +383,31 @@ export function CustomVideoPlayer({
                 <div className={cn("mb-2", isFullscreen && "mb-4")}>
                     <div
                         className={cn(
-                            "relative cursor-pointer rounded-full bg-white/30",
+                            "custom-progress-bar relative cursor-pointer rounded-full bg-white/30",
                             isFullscreen ? "h-2" : "h-1",
                         )}
-                        onClick={(e) => {
-                            const rect =
-                                e.currentTarget.getBoundingClientRect();
-                            const progress =
-                                (e.clientX - rect.left) / rect.width;
-                            handleSeek(progress * duration);
-                        }}
+                        onMouseDown={handleScrubStart}
                     >
                         <div
-                            className="absolute top-0 left-0 h-full rounded-full bg-white" // Removed transition-all
+                            className="absolute top-0 left-0 h-full rounded-full bg-white"
                             style={{
-                                width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%`,
+                                width: `${duration > 0 ? ((isScrubbing && scrubTime !== null ? scrubTime : currentTime) / duration) * 100 : 0}%`,
                             }}
                         />
+                        {/* Scrub time preview */}
+                        {isScrubbing && scrubTime !== null && (
+                            <div
+                                className={cn(
+                                    "pointer-events-none absolute -top-7 left-0 z-10 rounded bg-black/80 px-2 py-1 text-xs text-white select-none",
+                                    isFullscreen ? "text-sm" : "",
+                                )}
+                                style={{
+                                    left: `calc(${(scrubTime / duration) * 100}% - 24px)`,
+                                }}
+                            >
+                                {formatTime(scrubTime)}
+                            </div>
+                        )}
                     </div>
                 </div>
 
