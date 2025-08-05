@@ -82,7 +82,7 @@ export default function MessageChannel({
     className,
     goToMessageId,
 }: MessageChannelProps) {
-    const { serverRecord } = useServer();
+    const { serverRecord, loadedChannels, markChannelLoaded } = useServer();
     const [messageText, setMessageText] = React.useState("");
     const [messages, setMessages] = React.useState<Message[]>([]);
     const [loading, setLoading] = React.useState(false);
@@ -226,11 +226,6 @@ export default function MessageChannel({
                 }
                 case MESSAGE_TYPES.MESSAGE_DELETED: {
                     const deleteData = message.data as MessageDeletedBroadcast;
-                    cacheManager.deleteMessage(
-                        currentUserId,
-                        channelId,
-                        deleteData.message_id,
-                    );
                     if (deleteData.channel_id === channelId) {
                         setMessages((prev) =>
                             prev.filter(
@@ -242,15 +237,6 @@ export default function MessageChannel({
                 }
                 case MESSAGE_TYPES.MESSAGE_EDITED: {
                     const editData = message.data as MessageEditedBroadcast;
-                    cacheManager.updateMessage(
-                        currentUserId,
-                        channelId,
-                        editData.id,
-                        {
-                            content: editData.content,
-                            updated_at: editData.updated_at,
-                        },
-                    );
 
                     if (editData.channel_id === channelId) {
                         setMessages((prev) =>
@@ -292,18 +278,20 @@ export default function MessageChannel({
         const fetchMessages = async () => {
             if (!channelId || !currentUserId) return;
 
-            // Try cache first
-            const cachedMessages = cacheManager.getMessages(
-                currentUserId,
-                channelId,
-            );
-            if (cachedMessages && cachedMessages.length > 0) {
-                setMessages(cachedMessages);
-                setLoading(false);
+            // If already loaded, do not fetch again
+            if (loadedChannels.has(channelId)) {
+                // But always set messages from cache (in case of reload)
+                const cachedMessages = cacheManager.getMessages(
+                    currentUserId,
+                    channelId,
+                );
+                if (cachedMessages && cachedMessages.length > 0) {
+                    setMessages(cachedMessages);
+                    setLoading(false);
+                }
                 return;
             }
 
-            // No cache, fetch fresh
             setLoading(true);
             setError(null);
 
@@ -328,6 +316,7 @@ export default function MessageChannel({
                     channelId,
                     sortedMessages,
                 );
+                markChannelLoaded(channelId);
             } catch (err) {
                 setError(
                     err instanceof Error

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Dispatch, SetStateAction } from "react";
 import {
     ChannelGroup,
     User,
@@ -36,6 +36,10 @@ import {
     UserLeftBroadcast,
     ServerIconUpdatedBroadcast,
     ServerConfigUpdatedBroadcast,
+    MessageDeletedBroadcast,
+    MessageEditedBroadcast,
+    MessagePinnedBroadcast,
+    MessageUnpinnedBroadcast,
 } from "@/websocket/websocket-manager";
 import { toast } from "sonner";
 import {
@@ -55,9 +59,12 @@ interface ServerContextState {
 
     // UI state
     selectedChannelId: number | null;
+    loadedChannels: Set<number>;
     selectedVoiceChannelId: number | null;
     showMembers: boolean;
-    goToMessageId: number | null; // Add this for message navigation
+    goToMessageId: number | null;
+    pinnedMessages: Record<number, Message[]>;
+    loadedPinnedChannels: Set<number>;
 
     // Loading states
     loading: boolean;
@@ -72,10 +79,13 @@ interface ServerContextState {
     clearServerStatusCache: () => void;
     leaveCurrentServer: () => Promise<void>;
     getSelectedChannel: () => Channel | null;
+    markChannelLoaded: (channelId: number) => void;
     getSelectedVoiceChannel: () => Channel | null;
     getUserById: (userId: string) => User | null;
     isChannelUnread: (channelId: number) => boolean;
-    goToMessage: (channelId: number, messageId: number) => void; // Add this function
+    goToMessage: (channelId: number, messageId: number) => void;
+    markPinnedLoaded: (channelId: number) => void;
+    setPinnedMessages: Dispatch<SetStateAction<Record<number, Message[]>>>;
 }
 
 const ServerContext = React.createContext<ServerContextState | null>(null);
@@ -94,6 +104,9 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
     );
     const [users, setUsers] = React.useState<User[]>([]);
     const [roles, setRoles] = React.useState<Role[]>([]);
+    const [loadedChannels, setLoadedChannels] = React.useState<Set<number>>(
+        new Set(),
+    );
     const [selectedChannelId, setSelectedChannelId] = React.useState<
         number | null
     >(null);
@@ -106,6 +119,12 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
     const [goToMessageId, setGoToMessageId] = React.useState<number | null>(
         null,
     );
+    const [pinnedMessages, setPinnedMessages] = React.useState<
+        Record<number, Message[]>
+    >({});
+    const [loadedPinnedChannels, setLoadedPinnedChannels] = React.useState<
+        Set<number>
+    >(new Set());
 
     // Always refresh server info on launch and cache it
     React.useEffect(() => {
@@ -268,6 +287,15 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         return null;
     }, [selectedChannelId, channelGroups]);
 
+    const markChannelLoaded = React.useCallback((channelId: number) => {
+        setLoadedChannels((prev) => {
+            if (prev.has(channelId)) return prev;
+            const next = new Set(prev);
+            next.add(channelId);
+            return next;
+        });
+    }, []);
+
     // Helper function to get current selected voice channel
     const getSelectedVoiceChannel = React.useCallback(() => {
         if (!selectedVoiceChannelId) return null;
@@ -344,6 +372,15 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         },
         [serverRecord?.server_url, channelGroups],
     );
+
+    const markPinnedLoaded = React.useCallback((channelId: number) => {
+        setLoadedPinnedChannels((prev) => {
+            if (prev.has(channelId)) return prev;
+            const next = new Set(prev);
+            next.add(channelId);
+            return next;
+        });
+    }, []);
 
     // Add WebSocket message handler for user status updates and channel updates
     React.useEffect(() => {
@@ -425,6 +462,30 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                             messageData.created_at,
                         );
                     }
+                    break;
+                }
+
+                case MESSAGE_TYPES.MESSAGE_DELETED: {
+                    const deleteData = message.data as MessageDeletedBroadcast;
+                    cacheManager.deleteMessage(
+                        userId,
+                        deleteData.channel_id,
+                        deleteData.message_id,
+                    );
+                    break;
+                }
+
+                case MESSAGE_TYPES.MESSAGE_EDITED: {
+                    const editData = message.data as MessageEditedBroadcast;
+                    cacheManager.updateMessage(
+                        userId,
+                        editData.channel_id,
+                        editData.id,
+                        {
+                            content: editData.content,
+                            updated_at: editData.updated_at,
+                        },
+                    );
                     break;
                 }
 
@@ -779,6 +840,34 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
                     toast.success("Server configuration updated");
                     break;
                 }
+
+                case MESSAGE_TYPES.MESSAGE_PINNED: {
+                    const data = message.data as MessagePinnedBroadcast & {
+                        message: Message;
+                    };
+                    setPinnedMessages((prev) => {
+                        const arr = prev[data.channel_id] || [];
+                        // Avoid duplicates
+                        if (arr.some((m) => m.id === data.message.id))
+                            return prev;
+                        return {
+                            ...prev,
+                            [data.channel_id]: [...arr, data.message],
+                        };
+                    });
+                    break;
+                }
+
+                case MESSAGE_TYPES.MESSAGE_UNPINNED: {
+                    const data = message.data as MessageUnpinnedBroadcast;
+                    setPinnedMessages((prev) => ({
+                        ...prev,
+                        [data.channel_id]: (prev[data.channel_id] || []).filter(
+                            (m) => m.id !== data.message_id,
+                        ),
+                    }));
+                    break;
+                }
             }
         };
 
@@ -849,12 +938,16 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         users,
         roles,
         selectedChannelId,
+        loadedChannels,
         selectedVoiceChannelId,
         showMembers,
         goToMessageId,
         loading,
         error,
+        pinnedMessages,
+        loadedPinnedChannels,
         setSelectedChannelId,
+        markChannelLoaded,
         setSelectedVoiceChannelId,
         setChannelGroups,
         toggleMemberList,
@@ -866,6 +959,8 @@ export function ServerProvider({ children, userId }: ServerProviderProps) {
         getUserById,
         isChannelUnread: isChannelUnreadHelper,
         goToMessage,
+        markPinnedLoaded,
+        setPinnedMessages,
     };
 
     return (

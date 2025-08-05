@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/utils/tailwind";
 import { UserPopover } from "./user-popup";
-import { useMembers } from "@/contexts/server-context";
+import { useMembers, useServer } from "@/contexts/server-context";
 import { downloadFile } from "@/utils/assets";
 import { formatMessageDate } from "./message-channel/message-item";
 
@@ -34,12 +34,23 @@ export function PinnedPopup({
     channelId,
     className,
 }: PinnedPopupProps) {
-    const [pinnedMessages, setPinnedMessages] = React.useState<Message[]>([]);
+    const {
+        pinnedMessages,
+        loadedPinnedChannels,
+        markPinnedLoaded,
+        setPinnedMessages,
+    } = useServer();
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
+    const messages = pinnedMessages[channelId] || [];
 
     React.useEffect(() => {
         const fetchPinnedMessages = async () => {
+            if (loadedPinnedChannels.has(channelId)) {
+                setLoading(false);
+                setError(null);
+                return;
+            }
             try {
                 setLoading(true);
                 setError(null);
@@ -48,7 +59,11 @@ export function PinnedPopup({
                     userId,
                     channelId,
                 );
-                setPinnedMessages(response.pinned_messages);
+                setPinnedMessages((prev) => ({
+                    ...prev,
+                    [channelId]: response.pinned_messages,
+                }));
+                markPinnedLoaded(channelId);
             } catch (err) {
                 setError(
                     err instanceof Error
@@ -61,7 +76,7 @@ export function PinnedPopup({
         };
 
         fetchPinnedMessages();
-    }, [serverUrl, userId, channelId]);
+    }, [serverUrl, userId, channelId, loadedPinnedChannels, markPinnedLoaded]);
 
     if (loading) {
         return (
@@ -101,7 +116,7 @@ export function PinnedPopup({
         );
     }
 
-    if (pinnedMessages.length === 0) {
+    if (messages.length === 0) {
         return (
             <div className={cn("w-96 p-4", className)}>
                 <div className="mb-4 flex items-center justify-between">
@@ -126,14 +141,14 @@ export function PinnedPopup({
                 <div className="flex items-center gap-1">
                     <Pin size={16} className="text-muted-foreground" />
                     <span className="text-muted-foreground text-sm">
-                        {pinnedMessages.length}
+                        {messages.length}
                     </span>
                 </div>
             </div>
 
             <div className="max-h-80 overflow-y-auto">
                 <div className="space-y-4">
-                    {pinnedMessages.map((message) => (
+                    {messages.map((message) => (
                         <PinnedMessageItem
                             key={message.id}
                             message={message}
