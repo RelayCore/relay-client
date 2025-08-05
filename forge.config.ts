@@ -8,9 +8,29 @@ import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
 import { APP_CONFIG } from "./src/config";
 
+import os from "os";
 import { spawn } from "node:child_process";
 import * as fs from "fs";
 import * as path from "path";
+
+const isRpmSupported =
+    ["fedora", "centos", "redhat", "rhel", "suse"].some((distro) =>
+        os.release().toLowerCase().includes(distro),
+    ) || process.env.FORCE_RPM === "1";
+
+const makers = [
+    new MakerSquirrel({
+        iconUrl: `https://raw.githubusercontent.com/${APP_CONFIG.repo}/main/src/assets/icons/icon.ico`,
+        setupIcon: "./src/assets/icons/icon.ico",
+        setupExe: `${APP_CONFIG.name.replaceAll(" ", "")}Setup.exe`,
+    }),
+    new MakerZIP({}, ["darwin"]),
+    new MakerDeb({}),
+];
+
+if (isRpmSupported) {
+    makers.push(new MakerRpm({}));
+}
 
 const config: ForgeConfig = {
     packagerConfig: {
@@ -105,16 +125,7 @@ const config: ForgeConfig = {
         },
     },
     rebuildConfig: {},
-    makers: [
-        new MakerSquirrel({
-            iconUrl: `https://raw.githubusercontent.com/${APP_CONFIG.repo}/main/src/assets/icons/icon.ico`,
-            setupIcon: "./src/assets/icons/icon.ico",
-            setupExe: `${APP_CONFIG.name.replaceAll(" ", "")}Setup.exe`,
-        }),
-        new MakerZIP({}, ["darwin"]),
-        new MakerRpm({}),
-        new MakerDeb({}),
-    ],
+    makers,
     publishers: [
         {
             name: "@electron-forge/publisher-github",
