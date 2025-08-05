@@ -79,8 +79,12 @@ export function IdentitySyncSignIn({
                 throw new Error("Sign in failed - no data returned");
             }
 
-            // Store the successful auth URL
+            const token = result.data.token;
+            if (!token) {
+                throw new Error("Sign in failed - no token returned");
+            }
             localStorage.setItem("authBaseURL", normalizedUrl);
+            localStorage.setItem("authToken", token);
 
             toast.success("Successfully signed in to identity sync server");
             onSignInSuccess?.(normalizedUrl);

@@ -342,14 +342,27 @@ export async function getNewIdentities(
     );
 }
 
+function getAuthToken(): string | null {
+    return localStorage.getItem("authToken");
+}
+
 /**
  * Fetch all identities from the server for the current session.
  */
 export async function fetchServerIdentities(
     serverUrl: string,
-): Promise<ServerIdentity[]> {
+): Promise<ServerIdentity[] | null> {
+    const token = getAuthToken();
+    if (!token) {
+        return null;
+    }
+
     const response = await fetch(`${serverUrl}/api/identity`, {
         credentials: "include",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+        },
     });
     if (!response.ok) {
         throw new Error(`Failed to fetch identities: ${response.statusText}`);
@@ -363,12 +376,18 @@ export async function fetchServerIdentities(
 export async function createServerIdentity(
     serverUrl: string,
     identity: UserIdentity,
-): Promise<ServerIdentity> {
+): Promise<ServerIdentity | null> {
+    const token = getAuthToken();
+    if (!token) {
+        return null;
+    }
+
     const response = await fetch(`${serverUrl}/api/identity`, {
         method: "POST",
         credentials: "include",
         headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
             identity_id: identity.identity_id,
@@ -390,12 +409,18 @@ export async function updateServerIdentity(
     serverUrl: string,
     identity_id: string,
     updates: UserIdentity,
-): Promise<ServerIdentity> {
+): Promise<ServerIdentity | null> {
+    const token = getAuthToken();
+    if (!token) {
+        return null;
+    }
+
     const response = await fetch(`${serverUrl}/api/identity/${identity_id}`, {
         method: "PUT",
         credentials: "include",
         headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
             public_key: updates.public_key,
@@ -415,10 +440,18 @@ export async function updateServerIdentity(
 export async function deleteServerIdentity(
     serverUrl: string,
     identity_id: string,
-): Promise<void> {
+): Promise<void | null> {
+    const token = getAuthToken();
+    if (!token) {
+        return null;
+    }
+
     const response = await fetch(`${serverUrl}/api/identity/${identity_id}`, {
         method: "DELETE",
         credentials: "include",
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
     });
     if (!response.ok) {
         throw new Error(`Failed to delete identity: ${response.statusText}`);
@@ -431,9 +464,17 @@ export async function deleteServerIdentity(
 export async function fetchServerIdentityById(
     serverUrl: string,
     identity_id: string,
-): Promise<ServerIdentity> {
+): Promise<ServerIdentity | null> {
+    const token = getAuthToken();
+    if (!token) {
+        return null;
+    }
+
     const response = await fetch(`${serverUrl}/api/identity/${identity_id}`, {
         credentials: "include",
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
     });
     if (!response.ok) {
         throw new Error(`Failed to fetch identity: ${response.statusText}`);
@@ -457,8 +498,11 @@ function isNewer(a?: string, b?: string): boolean {
 export async function pullServerIdentitiesToLocal(
     serverUrl: string,
 ): Promise<void> {
-    const serverIdentities: ServerIdentity[] =
-        await fetchServerIdentities(serverUrl);
+    const serverIdentities = await fetchServerIdentities(serverUrl);
+    if (!serverIdentities) {
+        log("Failed to fetch server identities", "error", "sync");
+        return;
+    }
     const localServers = await loadServers();
     const localById = new Map(localServers.map((s) => [s.identity_id, s]));
 
@@ -497,8 +541,12 @@ export async function pushLocalIdentitiesToServer(
     serverUrl: string,
 ): Promise<void> {
     const localServers = await loadServers();
-    const serverIdentities: ServerIdentity[] =
-        await fetchServerIdentities(serverUrl);
+    const serverIdentities = await fetchServerIdentities(serverUrl);
+    if (!serverIdentities) {
+        log("Failed to fetch server identities", "error", "sync");
+        return;
+    }
+
     const serverById = new Map(serverIdentities.map((i) => [i.identity_id, i]));
 
     log(

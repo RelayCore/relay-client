@@ -206,31 +206,6 @@ app.whenReady().then(async () => {
         },
     );
 
-    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-        const responseHeaders = details.responseHeaders || {};
-
-        // Modify Set-Cookie headers to set SameSite=None for cross-site compatibility
-        if (responseHeaders["set-cookie"]) {
-            responseHeaders["set-cookie"] = responseHeaders["set-cookie"].map(
-                (cookie) => {
-                    let modifiedCookie = cookie.replace(
-                        /;\s*SameSite=(Lax|Strict|None)/gi,
-                        "",
-                    );
-
-                    modifiedCookie += "; SameSite=None";
-                    if (!modifiedCookie.includes("Secure")) {
-                        modifiedCookie += "; Secure";
-                    }
-
-                    return modifiedCookie;
-                },
-            );
-        }
-
-        callback({ responseHeaders });
-    });
-
     protocol.handle(imageProtocolName, async (request) => {
         try {
             const url = new URL(request.url);
