@@ -197,7 +197,7 @@ app.whenReady().then(async () => {
                     name: "auth_token",
                 });
                 if (cookies.length > 0) {
-                    details.requestHeaders["Cookies"] =
+                    details.requestHeaders["Cookie"] =
                         `auth_token=${cookies[0].value}`;
                 }
             }
