@@ -392,11 +392,6 @@ function BaseLayoutContent({
                             path: "/",
                             sameSite: "lax",
                         });
-                        const cookies = await window.cookieAPI.get({
-                            url: server.server_url,
-                            name: "auth_token",
-                        });
-                        console.log("Cookies after set:", cookies);
                     }
                 }
 
