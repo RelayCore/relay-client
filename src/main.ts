@@ -189,16 +189,17 @@ app.whenReady().then(async () => {
 
     session.defaultSession.webRequest.onBeforeSendHeaders(
         async (details, callback) => {
-            details.requestHeaders["Origin"] = "https://relay-client/";
-            details.requestHeaders["Referer"] = "https://relay-client/";
             if (!LOCAL_URLS.some((url) => details.url.includes(url))) {
                 const cookies = await session.defaultSession.cookies.get({
                     url: details.url,
                     name: "auth_token",
                 });
                 if (cookies.length > 0) {
-                    details.requestHeaders["Cookie"] =
-                        `auth_token=${cookies[0].value}`;
+                    const existingCookie = details.requestHeaders["Cookie"];
+                    const authCookie = `auth_token=${cookies[0].value}`;
+                    details.requestHeaders["Cookie"] = existingCookie
+                        ? `${existingCookie}; ${authCookie}`
+                        : authCookie;
                 }
             }
             callback({ requestHeaders: details.requestHeaders });
