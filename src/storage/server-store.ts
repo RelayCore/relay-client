@@ -590,6 +590,7 @@ export async function syncIdentitiesWithServer(
 ): Promise<void> {
     log("Syncing identities with server", "info", "sync");
     await pushLocalIdentitiesToServer(serverUrl);
+    await pullServerIdentitiesToLocal(serverUrl);
 }
 
 /**
