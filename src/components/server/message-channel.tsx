@@ -82,7 +82,6 @@ export default function MessageChannel({
     className,
     goToMessageId,
 }: MessageChannelProps) {
-    const { serverRecord, loadedChannels, markChannelLoaded } = useServer();
     const [messageText, setMessageText] = React.useState("");
     const [messages, setMessages] = React.useState<Message[]>([]);
     const [loading, setLoading] = React.useState(false);
@@ -125,7 +124,13 @@ export default function MessageChannel({
     const mentionAnchorRef = React.useRef<HTMLDivElement>(null);
 
     const { currentUser } = useCurrentUser();
-    const { serverInfo, getSelectedChannel } = useServer();
+    const {
+        serverInfo,
+        serverRecord,
+        loadedChannels,
+        markChannelLoaded,
+        getSelectedChannel,
+    } = useServer();
     const { users } = useMembers();
 
     const distanceFromBottomRef = React.useRef(0);
@@ -285,7 +290,7 @@ export default function MessageChannel({
                     currentUserId,
                     channelId,
                 );
-                if (cachedMessages && cachedMessages.length > 0) {
+                if (cachedMessages) {
                     setMessages(cachedMessages);
                     setLoading(false);
                 }
