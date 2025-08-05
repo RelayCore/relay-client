@@ -357,6 +357,10 @@ export async function apiRequest<T>(
     const requestHeaders: Record<string, string> = { ...headers };
     const startTime = performance.now();
 
+    const TIMEOUT_MS = 2000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
     try {
         // Authentication
         if (requiresAuth && userId) {
@@ -462,10 +466,12 @@ export async function apiRequest<T>(
             method,
             headers: requestHeaders,
             body,
+            signal: controller.signal,
         });
 
         const endTime = performance.now();
         const duration = Math.round(endTime - startTime);
+        clearTimeout(timeoutId);
 
         // Parse response
         let responseData: T;
@@ -563,6 +569,7 @@ export async function apiRequest<T>(
     } catch (error) {
         const endTime = performance.now();
         const duration = Math.round(endTime - startTime);
+        clearTimeout(timeoutId);
 
         logError(
             `${method} ${endpoint}`,
