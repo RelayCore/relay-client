@@ -29,6 +29,7 @@ import {
     restoreIdentityToServer,
     findExistingServersForIdentities,
     getNewIdentities,
+    deleteServerIdentity,
 } from "@/storage/server-store";
 import { JoinServerDialog } from "@/components/server/join-server-dialog";
 import { ExportIdentityDialog } from "@/components/identity/export-identity";
@@ -440,6 +441,10 @@ export default function HomePage() {
                     // Try to leave gracefully if server is online
                     try {
                         await leaveServer(server.server_url, server.user_id);
+                        await deleteServerIdentity(
+                            server.server_url,
+                            server.identity_id,
+                        );
                         toast.success("Successfully left the server");
                     } catch (error) {
                         // If leaving fails but server is online, show error but don't remove locally
