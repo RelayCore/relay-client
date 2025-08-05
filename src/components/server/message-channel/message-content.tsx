@@ -236,6 +236,76 @@ function ImageLinkAttachment({
 }
 
 /**
+ * Generic card-style embed component for previews (OpenGraph, YouTube, etc)
+ */
+function CardEmbed({
+    as = "a",
+    href,
+    borderColor,
+    image,
+    imagePosition = "left",
+    imageClassName,
+    onImageClick,
+    children,
+    className,
+    ...rest
+}: {
+    as?: "a" | "div";
+    href?: string;
+    borderColor?: string;
+    image?: React.ReactNode;
+    imagePosition?: "left" | "right" | "top" | "bottom";
+    imageClassName?: string;
+    onImageClick?: (e: React.MouseEvent) => void;
+    children: React.ReactNode;
+    className?: string;
+    [key: string]: unknown;
+}) {
+    const Container = as;
+    const flexDirection =
+        imagePosition === "top"
+            ? "flex-col"
+            : imagePosition === "bottom"
+              ? "flex-col-reverse"
+              : imagePosition === "right"
+                ? "flex-row-reverse"
+                : "flex-row";
+
+    return (
+        <Container
+            href={as === "a" ? href : undefined}
+            target={as === "a" && href ? "_blank" : undefined}
+            rel={as === "a" && href ? "noopener noreferrer" : undefined}
+            className={cn(
+                "hover:bg-muted/50 text-foreground my-2 mr-12 block max-w-xl rounded-lg border p-3 text-sm no-underline transition-colors",
+                className,
+            )}
+            style={borderColor ? { borderColor } : undefined}
+            {...rest}
+        >
+            <div className={cn("flex gap-3", flexDirection)}>
+                {image && (
+                    <div
+                        className={cn(
+                            "flex-shrink-0",
+                            imagePosition === "left" ||
+                                imagePosition === "right"
+                                ? "w-auto"
+                                : "w-full",
+                            imageClassName,
+                        )}
+                        onClick={onImageClick}
+                    >
+                        {image}
+                    </div>
+                )}
+                <div className="min-w-0 flex-grow">{children}</div>
+            </div>
+        </Container>
+    );
+}
+
+/**
  * Component for rendering OpenGraph previews
  */
 function OpenGraphPreviewSpan({
@@ -279,41 +349,35 @@ function OpenGraphPreviewSpan({
     };
 
     return (
-        <a
+        <CardEmbed
             href={ogUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:bg-muted/50 text-foreground my-2 mr-12 block max-w-xl rounded-lg border p-3 text-sm no-underline transition-colors"
-            style={{ borderColor: borderColor }}
+            borderColor={borderColor}
+            image={
+                imageUrl && !imgError ? (
+                    <img
+                        src={imageUrl}
+                        alt={title || "OpenGraph image"}
+                        className="h-auto max-h-[98px] w-full cursor-pointer rounded object-contain transition-opacity hover:opacity-80"
+                        onClick={handleImageClick}
+                        onLoad={() => onContentLoad?.()}
+                        onError={() => setImgError(true)}
+                    />
+                ) : null
+            }
+            imagePosition="left"
         >
-            <div className={cn("flex gap-3", !imageUrl && "flex-col")}>
-                {imageUrl && !imgError && (
-                    <div className="w-auto flex-shrink-0">
-                        <img
-                            src={imageUrl}
-                            alt={title || "OpenGraph image"}
-                            className="h-auto max-h-[98px] w-full cursor-pointer rounded object-contain transition-opacity hover:opacity-80"
-                            onClick={handleImageClick}
-                            onLoad={() => onContentLoad?.()}
-                            onError={() => setImgError(true)}
-                        />
-                    </div>
-                )}
-                <div className="min-w-0 flex-grow">
-                    <div
-                        className="text-primary truncate font-semibold"
-                        title={title || originalUrlText}
-                    >
-                        {title || originalUrlText}
-                    </div>
-                    {description && (
-                        <div className="text-muted-foreground line-clamp-5 text-xs">
-                            {description}
-                        </div>
-                    )}
-                </div>
+            <div
+                className="text-primary truncate font-semibold"
+                title={title || originalUrlText}
+            >
+                {title || originalUrlText}
             </div>
-        </a>
+            {description && (
+                <div className="text-muted-foreground line-clamp-5 text-xs">
+                    {description}
+                </div>
+            )}
+        </CardEmbed>
     );
 }
 
@@ -371,42 +435,10 @@ function YouTubeEmbed({
     const borderColor = useSetting("ogBorderColor") ? "#ff0033" : undefined;
 
     return (
-        <div className="my-2 mr-12 max-w-xl">
-            <a
-                href={youtubeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:bg-muted/50 text-foreground block rounded-lg border p-3 text-sm no-underline transition-colors"
-                style={{ borderColor: borderColor }}
-            >
-                {/* Video metadata header */}
-                <div className="mb-2">
-                    {videoData.loading ? (
-                        <div className="text-muted-foreground text-sm">
-                            Loading video info...
-                        </div>
-                    ) : videoData.error ? (
-                        <div className="text-primary text-sm font-semibold">
-                            YouTube Video
-                        </div>
-                    ) : (
-                        <>
-                            <div
-                                className="text-primary line-clamp-2 font-semibold"
-                                title={videoData.title}
-                            >
-                                {videoData.title}
-                            </div>
-                            {videoData.author_name && (
-                                <div className="text-muted-foreground mt-1 text-xs">
-                                    by {videoData.author_name}
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
-
-                {/* Video embed */}
+        <CardEmbed
+            href={youtubeUrl}
+            borderColor={borderColor}
+            image={
                 <div className="relative aspect-video w-full overflow-hidden rounded border">
                     <iframe
                         src={`https://www.youtube.com/embed/${youTubeId}`}
@@ -417,7 +449,34 @@ function YouTubeEmbed({
                         onLoad={() => onContentLoad?.()}
                     />
                 </div>
-            </a>
-        </div>
+            }
+            imagePosition="top"
+        >
+            <div className="mb-2">
+                {videoData.loading ? (
+                    <div className="text-muted-foreground text-sm">
+                        Loading video info...
+                    </div>
+                ) : videoData.error ? (
+                    <div className="text-primary text-sm font-semibold">
+                        YouTube Video
+                    </div>
+                ) : (
+                    <>
+                        <div
+                            className="text-primary line-clamp-2 font-semibold"
+                            title={videoData.title}
+                        >
+                            {videoData.title}
+                        </div>
+                        {videoData.author_name && (
+                            <div className="text-muted-foreground mt-1 text-xs">
+                                by {videoData.author_name}
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        </CardEmbed>
     );
 }
