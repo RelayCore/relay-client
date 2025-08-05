@@ -808,7 +808,7 @@ export default function HomePage() {
 
                         return (
                             <Card
-                                key={server.user_id}
+                                key={server.server_url}
                                 className={`ease-snappy transition-all ${
                                     !isServerAccessible(server)
                                         ? "cursor-not-allowed opacity-60"

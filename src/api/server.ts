@@ -357,7 +357,7 @@ export async function apiRequest<T>(
     const requestHeaders: Record<string, string> = { ...headers };
     const startTime = performance.now();
 
-    const TIMEOUT_MS = 2000;
+    const TIMEOUT_MS = 5000;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 

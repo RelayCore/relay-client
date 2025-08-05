@@ -2,6 +2,7 @@ import { log } from "@/utils/logger";
 import QRCode from "qrcode";
 
 let syncInterval: NodeJS.Timeout | null = null;
+let syncOngoing: boolean = false;
 
 const getFilePath = async (): Promise<string> => {
     const systemPaths = await window.fileSystem.getSystemPaths();
@@ -498,9 +499,11 @@ function isNewer(a?: string, b?: string): boolean {
 export async function pullServerIdentitiesToLocal(
     serverUrl: string,
 ): Promise<void> {
+    syncOngoing = true;
     const serverIdentities = await fetchServerIdentities(serverUrl);
     if (!serverIdentities) {
         log("Failed to fetch server identities", "error", "sync");
+        syncOngoing = false;
         return;
     }
     const localServers = await loadServers();
@@ -532,6 +535,8 @@ export async function pullServerIdentitiesToLocal(
             );
         }
     }
+
+    syncOngoing = false;
 }
 
 /**
@@ -540,10 +545,12 @@ export async function pullServerIdentitiesToLocal(
 export async function pushLocalIdentitiesToServer(
     serverUrl: string,
 ): Promise<void> {
+    syncOngoing = true;
     const localServers = await loadServers();
     const serverIdentities = await fetchServerIdentities(serverUrl);
     if (!serverIdentities) {
         log("Failed to fetch server identities", "error", "sync");
+        syncOngoing = false;
         return;
     }
 
@@ -580,6 +587,8 @@ export async function pushLocalIdentitiesToServer(
             );
         }
     }
+
+    syncOngoing = false;
 }
 
 /**
@@ -588,9 +597,23 @@ export async function pushLocalIdentitiesToServer(
 export async function syncIdentitiesWithServer(
     serverUrl: string,
 ): Promise<void> {
+    if (syncOngoing) {
+        log(
+            "Sync already in progress, skipping new sync request",
+            "info",
+            "sync",
+        );
+        return;
+    }
+    syncOngoing = true;
     log("Syncing identities with server", "info", "sync");
-    await pullServerIdentitiesToLocal(serverUrl);
-    await pushLocalIdentitiesToServer(serverUrl);
+    try {
+        await pullServerIdentitiesToLocal(serverUrl);
+        await pushLocalIdentitiesToServer(serverUrl);
+    } finally {
+        log("Sync completed", "info", "sync");
+        syncOngoing = false;
+    }
 }
 
 /**

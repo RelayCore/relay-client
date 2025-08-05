@@ -632,7 +632,7 @@ function BaseLayoutContent({
                                 </SidebarMenuItem>
                                 {servers.map((server, index) => (
                                     <DraggableServerItem
-                                        key={server.user_id}
+                                        key={server.server_url}
                                         server={server}
                                         index={index}
                                         moveServer={moveServer}
