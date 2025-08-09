@@ -5,17 +5,58 @@ import { Copy, Check } from "lucide-react";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import Prism from "prismjs";
-import "prismjs/components/prism-jsx";
-import "prismjs/components/prism-tsx";
-import "prismjs/components/prism-typescript";
-import "prismjs/components/prism-javascript";
-import "prismjs/components/prism-css";
-import "prismjs/components/prism-json";
-import "prismjs/components/prism-markdown";
-import "prismjs/components/prism-bash";
 import "prismjs/themes/prism-tomorrow.css";
 
 import { cn } from "@/utils/tailwind";
+
+const prismLangImports: Record<string, () => Promise<unknown>> = {
+    javascript: () => import("prismjs/components/prism-javascript"),
+    jsx: () => import("prismjs/components/prism-jsx"),
+    typescript: () => import("prismjs/components/prism-typescript"),
+    tsx: () => import("prismjs/components/prism-tsx"),
+    python: () => import("prismjs/components/prism-python"),
+    java: () => import("prismjs/components/prism-java"),
+    c: () => import("prismjs/components/prism-c"),
+    cpp: () => import("prismjs/components/prism-cpp"),
+    css: () => import("prismjs/components/prism-css"),
+    markup: () => import("prismjs/components/prism-markup"),
+    html: () => import("prismjs/components/prism-markup"),
+    json: () => import("prismjs/components/prism-json"),
+    markdown: () => import("prismjs/components/prism-markdown"),
+    php: () => import("prismjs/components/prism-php"),
+    ruby: () => import("prismjs/components/prism-ruby"),
+    go: () => import("prismjs/components/prism-go"),
+    rust: () => import("prismjs/components/prism-rust"),
+    bash: () => import("prismjs/components/prism-bash"),
+    shell: () => import("prismjs/components/prism-bash"),
+    xml: () => import("prismjs/components/prism-xml-doc"),
+    yaml: () => import("prismjs/components/prism-yaml"),
+    ini: () => import("prismjs/components/prism-ini"),
+    log: () => import("prismjs/components/prism-log"),
+    diff: () => import("prismjs/components/prism-diff"),
+    properties: () => import("prismjs/components/prism-properties"),
+    sql: () => import("prismjs/components/prism-sql"),
+    perl: () => import("prismjs/components/prism-perl"),
+    scss: () => import("prismjs/components/prism-scss"),
+    less: () => import("prismjs/components/prism-less"),
+    docker: () => import("prismjs/components/prism-docker"),
+    git: () => import("prismjs/components/prism-git"),
+    powershell: () => import("prismjs/components/prism-powershell"),
+    makefile: () => import("prismjs/components/prism-makefile"),
+};
+
+async function ensurePrismLanguage(language: string | undefined) {
+    if (!language) return;
+    if (Prism.languages[language]) return;
+    const importFn = prismLangImports[language];
+    if (importFn) {
+        try {
+            await importFn();
+        } catch {
+            //
+        }
+    }
+}
 
 function CopyButton({ children }: { children: React.ReactNode }) {
     const [isCopied, setIsCopied] = React.useState(false);
@@ -57,14 +98,70 @@ const codeVariants = cva("rounded font-mono group", {
     },
 });
 
+/**
+ * Maps file extensions to Prism/Highlight.js language names.
+ * @param extension File extension (lowercase, no dot)
+ * @returns Language string for syntax highlighting, or undefined if unknown
+ */
+export function extensionToLanguage(extension: string): string | undefined {
+    switch (extension) {
+        case "js":
+        case "jsx":
+            return "javascript";
+        case "ts":
+        case "tsx":
+            return "typescript";
+        case "py":
+            return "python";
+        case "java":
+            return "java";
+        case "c":
+        case "h":
+            return "c";
+        case "cpp":
+        case "cc":
+        case "cxx":
+        case "hpp":
+            return "cpp";
+        case "css":
+            return "css";
+        case "html":
+        case "htm":
+            return "markup";
+        case "json":
+            return "json";
+        case "md":
+            return "markdown";
+        case "php":
+            return "php";
+        case "rb":
+            return "ruby";
+        case "go":
+            return "go";
+        case "rs":
+            return "rust";
+        case "sh":
+        case "bash":
+            return "bash";
+        case "xml":
+            return "xml";
+        case "yml":
+        case "yaml":
+            return "yaml";
+        default:
+            return undefined;
+    }
+}
+
 interface CodeProps
     extends React.ComponentPropsWithoutRef<"code">,
         VariantProps<typeof codeVariants> {
     children: React.ReactNode;
     startLine?: number;
     maxLines?: number;
+    maxHeight?: string;
     highlightLines?: number[];
-    language?: string; // Added language prop
+    language?: string;
 }
 
 function InlineCode({
@@ -87,7 +184,8 @@ function Code({
     className,
     variant,
     startLine = 1,
-    maxLines,
+    maxLines = undefined,
+    maxHeight = undefined,
     highlightLines = [],
     language = "typescript", // Default to typescript
     ...props
@@ -95,9 +193,17 @@ function Code({
     const codeRef = React.useRef<HTMLElement>(null);
 
     React.useEffect(() => {
-        if (codeRef.current && typeof children === "string") {
-            Prism.highlightElement(codeRef.current);
+        let cancelled = false;
+        async function highlight() {
+            await ensurePrismLanguage(language);
+            if (!cancelled && codeRef.current && typeof children === "string") {
+                Prism.highlightElement(codeRef.current);
+            }
         }
+        highlight();
+        return () => {
+            cancelled = true;
+        };
     }, [children, language]);
 
     if (variant === "inline") {
@@ -117,7 +223,9 @@ function Code({
 
     const containerStyle = maxLines
         ? { height: `${maxLines * 1.5}rem` }
-        : undefined;
+        : maxHeight
+          ? { height: maxHeight }
+          : undefined;
 
     return (
         <div
@@ -128,7 +236,7 @@ function Code({
             )}
             {...props}
         >
-            <CopyButton children={children} />
+            <CopyButton>{children}</CopyButton>
             {typeof children === "string" ? (
                 <ScrollArea
                     style={containerStyle}

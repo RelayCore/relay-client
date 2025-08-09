@@ -1,16 +1,19 @@
 import { User } from "@/api/server";
 
 export type MessageContentPart = {
-    type: "text" | "mention" | "tag" | "link" | "emoji";
+    type: "text" | "mention" | "tag" | "link" | "emoji" | "code";
     content: string;
+    prefix?: string;
+    suffix?: string;
     data?: {
         user?: User;
         url?: string;
         tagName?: string;
         emojiCode?: string;
-        isImageLink?: boolean; // Added for image link detection
-        isYouTubeLink?: boolean; // Added for YouTube detection
-        youTubeId?: string; // Added for YouTube video ID
+        isImageLink?: boolean;
+        isYouTubeLink?: boolean;
+        youTubeId?: string;
+        language?: string;
     };
 };
 
@@ -29,10 +32,74 @@ export class MessageContentProcessor {
         let parts: MessageContentPart[] = [{ type: "text", content: text }];
 
         // Apply processors in order
+        parts = this.processCodeBlocks(parts);
         parts = this.processLinks(parts);
         parts = this.processMentions(parts);
 
         return parts;
+    }
+
+    /**
+     * Process code blocks in the content
+     */
+    private processCodeBlocks(
+        parts: MessageContentPart[],
+    ): MessageContentPart[] {
+        const newParts: MessageContentPart[] = [];
+
+        for (const part of parts) {
+            if (part.type !== "text") {
+                newParts.push(part);
+                continue;
+            }
+
+            const codeParts = this.extractCodeBlocks(part.content);
+            newParts.push(...codeParts);
+        }
+
+        return newParts;
+    }
+
+    /**
+     * Extract code blocks from a text string
+     */
+    private extractCodeBlocks(text: string): MessageContentPart[] {
+        const parts: MessageContentPart[] = [];
+        let lastIndex = 0;
+
+        const codeBlockRegex = /(```(\w+)?\n)([\s\S]*?)(\n```)/g;
+        let match;
+
+        while ((match = codeBlockRegex.exec(text)) !== null) {
+            const [fullMatch, opening, language, codeContent, closing] = match;
+            const startIndex = match.index;
+
+            if (startIndex > lastIndex) {
+                parts.push({
+                    type: "text",
+                    content: text.slice(lastIndex, startIndex),
+                });
+            }
+
+            parts.push({
+                type: "code",
+                content: codeContent,
+                data: { language: language || "plaintext" },
+                prefix: opening,
+                suffix: closing,
+            });
+
+            lastIndex = startIndex + fullMatch.length;
+        }
+
+        if (lastIndex < text.length) {
+            parts.push({
+                type: "text",
+                content: text.slice(lastIndex),
+            });
+        }
+
+        return parts.length > 0 ? parts : [{ type: "text", content: text }];
     }
 
     /**

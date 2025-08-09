@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { cn } from "@/utils/tailwind";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -67,8 +67,25 @@ export function MessageInput({
     onCancelReply,
 }: MessageInputProps) {
     const { serverInfo } = useServer();
+    const overlayRef = useRef<HTMLDivElement>(null);
     const getFileKey = (file: File) =>
         `${file.name}-${file.size}-${file.lastModified}`;
+
+    useEffect(() => {
+        const textarea = textareaRef.current;
+        const overlay = overlayRef.current;
+        if (!textarea || !overlay) return;
+
+        const handleScroll = () => {
+            overlay.scrollTop = textarea.scrollTop;
+        };
+
+        handleScroll();
+        textarea.addEventListener("scroll", handleScroll);
+        return () => {
+            textarea.removeEventListener("scroll", handleScroll);
+        };
+    }, [textareaRef, messageText]);
 
     return (
         <div
@@ -187,8 +204,9 @@ export function MessageInput({
                     {/* Rich text display overlay - always visible when there's text */}
                     {messageText && (
                         <div
+                            ref={overlayRef}
                             className={cn(
-                                "pointer-events-none absolute inset-0 z-10 max-h-[200px] min-h-[40px] overflow-y-auto text-base md:text-sm",
+                                "pointer-events-none absolute inset-0 z-10 max-h-[200px] min-h-[40px] overflow-y-hidden text-base md:text-sm",
                                 "px-[0.8rem] py-[0.55rem]",
                             )}
                         >
@@ -199,6 +217,7 @@ export function MessageInput({
                                     "imageLinks",
                                     "openGraphPreviews",
                                     "youTubeEmbeds",
+                                    "code",
                                 ]}
                             />
                         </div>

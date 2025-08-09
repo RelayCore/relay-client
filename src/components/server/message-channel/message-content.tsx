@@ -5,11 +5,13 @@ import { UserPopover } from "../user-popup";
 import { MessageContentPart } from "./message-content-processor";
 import { AttachmentItem } from "./attachment-item";
 import { useSetting } from "@/utils/settings";
+import { Code } from "@/components/ui/code";
 
 export type DisabledFeature =
     | "imageLinks"
     | "openGraphPreviews"
-    | "youTubeEmbeds";
+    | "youTubeEmbeds"
+    | "code";
 
 /**
  * Component for rendering processed message content
@@ -118,6 +120,31 @@ export function ProcessedMessageContent({
                             />
                         );
                     }
+                    case "code":
+                        if (isFeatureDisabled("code")) {
+                            console.log(part);
+                            return (
+                                <span
+                                    key={index}
+                                    className="text-muted-foreground"
+                                    style={{ whiteSpace: "pre-wrap" }}
+                                >
+                                    {part.prefix}
+                                    {part.content}
+                                    {part.suffix}
+                                </span>
+                            );
+                        }
+
+                        return (
+                            <Code
+                                key={index}
+                                language={part.data?.language || "plaintext"}
+                                variant="default"
+                            >
+                                {part.content}
+                            </Code>
+                        );
                     case "text":
                     default:
                         return (
