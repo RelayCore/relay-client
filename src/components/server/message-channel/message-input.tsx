@@ -218,6 +218,7 @@ export function MessageInput({
                                     "openGraphPreviews",
                                     "youTubeEmbeds",
                                     "code",
+                                    "markdown",
                                 ]}
                             />
                         </div>

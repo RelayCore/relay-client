@@ -6,12 +6,14 @@ import { MessageContentPart } from "./message-content-processor";
 import { AttachmentItem } from "./attachment-item";
 import { useSetting } from "@/utils/settings";
 import { Code } from "@/components/ui/code";
+import { MarkdownSpan } from "@/components/ui/markdown-span";
 
 export type DisabledFeature =
     | "imageLinks"
     | "openGraphPreviews"
     | "youTubeEmbeds"
-    | "code";
+    | "code"
+    | "markdown";
 
 /**
  * Component for rendering processed message content
@@ -144,6 +146,30 @@ export function ProcessedMessageContent({
                             >
                                 {part.content}
                             </Code>
+                        );
+                    case "markdown":
+                        if (isFeatureDisabled("markdown")) {
+                            return (
+                                <span
+                                    key={index}
+                                    style={{ whiteSpace: "pre-wrap" }}
+                                >
+                                    {part.prefix}
+                                    {part.content}
+                                    {part.suffix}
+                                </span>
+                            );
+                        }
+
+                        return (
+                            <MarkdownSpan
+                                key={index}
+                                content={part.content}
+                                markdownType={part.data?.markdownType}
+                                headerLevel={part.data?.headerLevel}
+                                listType={part.data?.listType}
+                                listIndex={part.data?.listIndex}
+                            />
                         );
                     case "text":
                     default:

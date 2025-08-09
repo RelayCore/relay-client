@@ -1,7 +1,7 @@
 import { User } from "@/api/server";
 
 export type MessageContentPart = {
-    type: "text" | "mention" | "tag" | "link" | "emoji" | "code";
+    type: "text" | "mention" | "tag" | "link" | "emoji" | "code" | "markdown";
     content: string;
     prefix?: string;
     suffix?: string;
@@ -14,6 +14,16 @@ export type MessageContentPart = {
         isYouTubeLink?: boolean;
         youTubeId?: string;
         language?: string;
+        markdownType?:
+            | "bold"
+            | "italic"
+            | "strikethrough"
+            | "underline"
+            | "header"
+            | "list-item";
+        headerLevel?: number;
+        listType?: "ordered" | "unordered";
+        listIndex?: number;
     };
 };
 
@@ -33,6 +43,7 @@ export class MessageContentProcessor {
 
         // Apply processors in order
         parts = this.processCodeBlocks(parts);
+        parts = this.processMarkdown(parts);
         parts = this.processLinks(parts);
         parts = this.processMentions(parts);
 
@@ -92,6 +103,207 @@ export class MessageContentProcessor {
             lastIndex = startIndex + fullMatch.length;
         }
 
+        if (lastIndex < text.length) {
+            parts.push({
+                type: "text",
+                content: text.slice(lastIndex),
+            });
+        }
+
+        return parts.length > 0 ? parts : [{ type: "text", content: text }];
+    }
+
+    /**
+     * Process markdown formatting in the content
+     */
+    private processMarkdown(parts: MessageContentPart[]): MessageContentPart[] {
+        const newParts: MessageContentPart[] = [];
+
+        for (const part of parts) {
+            if (part.type !== "text") {
+                newParts.push(part);
+                continue;
+            }
+
+            const markdownParts = this.extractMarkdown(part.content);
+            newParts.push(...markdownParts);
+        }
+
+        return newParts;
+    }
+
+    /**
+     * Extract markdown formatting from a text string
+     */
+    private extractMarkdown(text: string): MessageContentPart[] {
+        const parts: MessageContentPart[] = [];
+        const lines = text.split("\n");
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+            // Remove carriage return if present
+            line = line.replace(/\r$/, "");
+
+            // Skip empty lines but preserve them as text
+            if (line.trim() === "") {
+                parts.push({ type: "text", content: "\n" });
+                continue;
+            }
+
+            // Check for headers (# ## ###)
+            const headerMatch = line.match(/^(#{1,6})\s+(.+)$/);
+            if (headerMatch) {
+                const [, hashes, content] = headerMatch;
+                parts.push({
+                    type: "markdown",
+                    content: content,
+                    prefix: hashes + " ",
+                    data: {
+                        markdownType: "header",
+                        headerLevel: hashes.length,
+                    },
+                });
+                continue;
+            }
+
+            // Check for ordered lists (1. 2. etc)
+            const orderedListMatch = line.match(/^(\s*)(\d+)\.\s+(.+)$/);
+            if (orderedListMatch) {
+                const [, indent, number, content] = orderedListMatch;
+                parts.push({
+                    type: "markdown",
+                    content: content,
+                    prefix: `${indent}${number}. `,
+                    data: {
+                        markdownType: "list-item",
+                        listType: "ordered",
+                        listIndex: parseInt(number),
+                    },
+                });
+                continue;
+            }
+
+            // Check for unordered lists (- or *)
+            const unorderedListMatch = line.match(/^(\s*)([-*])\s+(.+)$/);
+            if (unorderedListMatch) {
+                const [, indent, marker, content] = unorderedListMatch;
+                parts.push({
+                    type: "markdown",
+                    content: content,
+                    prefix: `${indent}${marker} `,
+                    data: {
+                        markdownType: "list-item",
+                        listType: "unordered",
+                    },
+                });
+                continue;
+            }
+
+            // Process inline markdown for regular lines
+            const inlineParts = this.processInlineMarkdown(line);
+            parts.push(...inlineParts);
+
+            if (i < lines.length - 1) {
+                parts.push({ type: "text", content: "\n" });
+            }
+        }
+
+        return parts.length > 0 ? parts : [{ type: "text", content: text }];
+    }
+
+    /**
+     * Process inline markdown formatting (bold, italic, strikethrough, underline)
+     */
+    private processInlineMarkdown(text: string): MessageContentPart[] {
+        const parts: MessageContentPart[] = [];
+        let lastIndex = 0;
+
+        // Combined regex for all inline formatting
+        // Order matters: longer patterns first to avoid conflicts
+        const inlineRegex =
+            /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|~~(.+?)~~|__(.+?)__|_(.+?)_)/g;
+        let match;
+
+        while ((match = inlineRegex.exec(text)) !== null) {
+            const [fullMatch] = match;
+            const startIndex = match.index;
+
+            // Add text before formatting
+            if (startIndex > lastIndex) {
+                parts.push({
+                    type: "text",
+                    content: text.slice(lastIndex, startIndex),
+                });
+            }
+
+            // Determine the type of formatting and prefix/suffix
+            let markdownType:
+                | "bold"
+                | "italic"
+                | "strikethrough"
+                | "underline"
+                | undefined;
+            let content: string | undefined;
+            let prefix: string | undefined;
+            let suffix: string | undefined;
+
+            if (match[2]) {
+                // ***bold italic***
+                content = match[2];
+                markdownType = "bold";
+                prefix = "***";
+                suffix = "***";
+            } else if (match[3]) {
+                // **bold**
+                content = match[3];
+                markdownType = "bold";
+                prefix = "**";
+                suffix = "**";
+            } else if (match[4]) {
+                // *italic*
+                content = match[4];
+                markdownType = "italic";
+                prefix = "*";
+                suffix = "*";
+            } else if (match[5]) {
+                // ~~strikethrough~~
+                content = match[5];
+                markdownType = "strikethrough";
+                prefix = "~~";
+                suffix = "~~";
+            } else if (match[6]) {
+                // __underline__
+                content = match[6];
+                markdownType = "underline";
+                prefix = "__";
+                suffix = "__";
+            } else if (match[7]) {
+                // _italic_
+                content = match[7];
+                markdownType = "italic";
+                prefix = "_";
+                suffix = "_";
+            } else {
+                // Fallback
+                parts.push({ type: "text", content: fullMatch });
+                lastIndex = startIndex + fullMatch.length;
+                continue;
+            }
+
+            if (content !== undefined && markdownType !== undefined) {
+                parts.push({
+                    type: "markdown",
+                    content,
+                    prefix,
+                    suffix,
+                    data: { markdownType },
+                });
+            }
+
+            lastIndex = startIndex + fullMatch.length;
+        }
+
+        // Add remaining text
         if (lastIndex < text.length) {
             parts.push({
                 type: "text",
