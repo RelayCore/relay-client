@@ -1,31 +1,44 @@
 import { User } from "@/api/server";
 
-export type MessageContentPart = {
-    type: "text" | "mention" | "tag" | "link" | "emoji" | "code" | "markdown";
-    content: string;
-    prefix?: string;
-    suffix?: string;
-    data?: {
-        user?: User;
-        url?: string;
-        tagName?: string;
-        emojiCode?: string;
-        isImageLink?: boolean;
-        isYouTubeLink?: boolean;
-        youTubeId?: string;
-        language?: string;
-        markdownType?:
-            | "bold"
-            | "italic"
-            | "strikethrough"
-            | "underline"
-            | "header"
-            | "list-item";
-        headerLevel?: number;
-        listType?: "ordered" | "unordered";
-        listIndex?: number;
-    };
+export type MentionData = { user?: User };
+export type LinkData = {
+    url: string;
+    isImageLink?: boolean;
+    isYouTubeLink?: boolean;
+    youTubeId?: string;
 };
+export type MarkdownData = {
+    markdownType:
+        | "bold"
+        | "italic"
+        | "strikethrough"
+        | "underline"
+        | "header"
+        | "list-item";
+    headerLevel?: number;
+    listType?: "ordered" | "unordered";
+    listIndex?: number;
+};
+export type CodeData = { language: string };
+
+export type MessageContentPart =
+    | { type: "text"; content: string }
+    | { type: "mention"; content: string; data: MentionData }
+    | { type: "link"; content: string; data: LinkData }
+    | {
+          type: "code";
+          content: string;
+          prefix?: string;
+          suffix?: string;
+          data: CodeData;
+      }
+    | {
+          type: "markdown";
+          content: string;
+          prefix?: string;
+          suffix?: string;
+          data: MarkdownData;
+      };
 
 export class MessageContentProcessor {
     private users: User[];
