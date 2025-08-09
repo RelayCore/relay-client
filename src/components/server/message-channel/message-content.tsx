@@ -149,14 +149,21 @@ export function ProcessedMessageContent({
                         );
                     case "markdown":
                         if (isFeatureDisabled("markdown")) {
+                            const breakpoint =
+                                part.data.markdownType === "list-item" ? (
+                                    <br />
+                                ) : null;
+
                             return (
                                 <span
                                     key={index}
                                     style={{ whiteSpace: "pre-wrap" }}
+                                    className="w-full"
                                 >
                                     {part.prefix}
                                     {part.content}
                                     {part.suffix}
+                                    {breakpoint}
                                 </span>
                             );
                         }
@@ -169,12 +176,14 @@ export function ProcessedMessageContent({
                                 headerLevel={part.data?.headerLevel}
                                 listType={part.data?.listType}
                                 listIndex={part.data?.listIndex}
+                                listLevel={part.data?.listLevel}
                             />
                         );
                     case "text":
                     default:
                         return (
                             <span
+                                data-tag="text"
                                 key={index}
                                 style={{ whiteSpace: "pre-wrap" }}
                             >

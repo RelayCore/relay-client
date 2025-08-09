@@ -18,6 +18,7 @@ export type MarkdownData = {
     headerLevel?: number;
     listType?: "ordered" | "unordered";
     listIndex?: number;
+    listLevel?: number;
 };
 export type CodeData = { language: string };
 
@@ -154,10 +155,8 @@ export class MessageContentProcessor {
 
         for (let i = 0; i < lines.length; i++) {
             let line = lines[i];
-            // Remove carriage return if present
             line = line.replace(/\r$/, "");
 
-            // Skip empty lines but preserve them as text
             if (line.trim() === "") {
                 parts.push({ type: "text", content: "\n" });
                 continue;
@@ -183,6 +182,7 @@ export class MessageContentProcessor {
             const orderedListMatch = line.match(/^(\s*)(\d+)\.\s+(.+)$/);
             if (orderedListMatch) {
                 const [, indent, number, content] = orderedListMatch;
+                const listLevel = Math.floor((indent || "").length / 2);
                 parts.push({
                     type: "markdown",
                     content: content,
@@ -191,6 +191,7 @@ export class MessageContentProcessor {
                         markdownType: "list-item",
                         listType: "ordered",
                         listIndex: parseInt(number),
+                        listLevel,
                     },
                 });
                 continue;
@@ -200,6 +201,7 @@ export class MessageContentProcessor {
             const unorderedListMatch = line.match(/^(\s*)([-*])\s+(.+)$/);
             if (unorderedListMatch) {
                 const [, indent, marker, content] = unorderedListMatch;
+                const listLevel = Math.floor((indent || "").length / 2);
                 parts.push({
                     type: "markdown",
                     content: content,
@@ -207,6 +209,7 @@ export class MessageContentProcessor {
                     data: {
                         markdownType: "list-item",
                         listType: "unordered",
+                        listLevel,
                     },
                 });
                 continue;
