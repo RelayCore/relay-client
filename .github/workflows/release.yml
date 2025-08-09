@@ -67,4 +67,5 @@ jobs:
             - name: Publish to GitHub Releases
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  FORCE_RPM: "1"
               run: npm run publish
